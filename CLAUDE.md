@@ -1,6 +1,6 @@
-# CLAUDE.md — CIMET AI QA Gate
+# CLAUDE.md — VerityGate (CIMET AI QA Gate hackathon submission)
 
-Project rules for Claude Code. Read `design_handoff/README.md` (design spec) and `design_handoff/NEXTJS_BUILD_PLAN.md` (architecture) before writing code.
+Project rules for Claude Code. See `README.md` (product/architecture overview), `docs/ARCHITECTURE.md`, `docs/DEMO.md`, and `docs/INTEGRATION.md` before writing code. The original design-handoff source files (HTML prototype, build plan) have been removed from the repository — the design they described has been fully implemented; see git history if the source is ever needed.
 
 ## What this is
 
