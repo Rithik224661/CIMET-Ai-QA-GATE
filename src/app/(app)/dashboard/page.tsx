@@ -6,7 +6,7 @@ import RecentFailures from "@/components/dashboard/RecentFailures";
 import RecentOverrides from "@/components/dashboard/RecentOverrides";
 import { getDashboardMetrics } from "@/lib/data/dashboard";
 
-export const metadata = { title: "Dashboard · CIMET QA Gate" };
+export const metadata = { title: "Dashboard · VerityGate" };
 
 export default async function DashboardPage() {
   const { kpis, distribution, failingChecks, recentFailures, recentOverrides } = await getDashboardMetrics();

@@ -45,7 +45,7 @@ export default function Rail({ queueBadgeCount }: { queueBadgeCount: number }) {
           <rect x="5" y="5" width="8" height="8" fill="#52a8ff" />
         </svg>
         <span className="text-[15px] font-medium tracking-[-0.3px]">
-          CIMET <span className="text-text-muted">QA Gate</span>
+          Verity<span className="text-text-muted">Gate</span>
         </span>
       </div>
 

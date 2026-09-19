@@ -16,6 +16,12 @@ export interface GateInput {
  * the backend already computed rather than regenerating this copy.
  */
 export interface GateOutcome {
+  /** The persisted GateDecision row's id (backend evaluation_id), shown in
+   * developer diagnostics as proof the decision came from a real backend
+   * execution rather than UI state — see brief §10. Only ever populated
+   * on the live backend-sourced path; evaluateGate()'s pure/unit-tested
+   * path below fills it with 0 since it never persists anything. */
+  evaluationId: number;
   decision: Decision;
   criticalFails: number;
   lowConfidence: number;
@@ -49,6 +55,7 @@ export function evaluateGate(
     criticalFails > 0 ? "HOLD" : lowConfidence > 0 ? "QA_REVIEW" : "AUTO_SUBMIT";
 
   const outcome: GateOutcome = {
+    evaluationId: 0,
     decision,
     criticalFails,
     lowConfidence,

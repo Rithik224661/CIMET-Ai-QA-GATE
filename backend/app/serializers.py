@@ -17,6 +17,7 @@ from .schemas import (
     SubmissionOut,
     TranscriptTurnOut,
 )
+from .services.audio_storage import has_recording
 
 
 def _format_timestamp(seconds: float | None) -> str | None:
@@ -57,6 +58,7 @@ def serialize_transcript_turn(segment: models.TranscriptSegment) -> TranscriptTu
 
 def serialize_gate_decision(decision: models.GateDecision) -> GateOutcomeOut:
     return GateOutcomeOut(
+        evaluation_id=decision.id,
         decision=decision.decision,
         critical_fails=decision.critical_fails,
         low_confidence=decision.low_confidence,
@@ -120,4 +122,5 @@ def serialize_lead(lead: models.Lead) -> LeadOut:
         ),
         decision=serialize_gate_decision(lead.decision) if lead.decision else None,
         submission=serialize_submission(lead.submission_record) if lead.submission_record else None,
+        has_audio=has_recording(lead.id),
     )

@@ -330,7 +330,13 @@ _METRIC_EVALUATORS = {
 AI_ELIGIBLE_METRICS = {"rapport", "interruptions", "objection_handling"}
 
 
-def evaluate_behaviour(check_config: dict, context: EvaluationContext) -> CheckOutcome:
+def evaluate_behaviour(
+    check_config: dict, context: EvaluationContext, ai_behaviour_results: dict | None = None
+) -> CheckOutcome:
+    """`ai_behaviour_results`, when not None, is the single per-lead
+    combined AI call's output (see ai_behaviour.evaluate_all_behaviour_
+    metrics, invoked once from pipeline.run_evaluation) — passing it
+    through as `precomputed` avoids a second per-check network call."""
     metric = check_config.get("metric")
     evaluator = _METRIC_EVALUATORS.get(metric)
     if evaluator is None:
@@ -343,6 +349,10 @@ def evaluate_behaviour(check_config: dict, context: EvaluationContext) -> CheckO
     if metric in AI_ELIGIBLE_METRICS and check_config.get("ai_enrichment", True):
         from ..ai_behaviour import maybe_refine_with_ai
 
+        if ai_behaviour_results is not None:
+            return maybe_refine_with_ai(
+                metric, check_config, context, deterministic_outcome, precomputed=ai_behaviour_results.get(metric)
+            )
         return maybe_refine_with_ai(metric, check_config, context, deterministic_outcome)
 
     return deterministic_outcome

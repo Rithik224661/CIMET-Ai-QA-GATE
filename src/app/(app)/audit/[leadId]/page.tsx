@@ -7,7 +7,7 @@ import { getLedger } from "@/lib/data/audit";
 
 export async function generateMetadata({ params }: { params: Promise<{ leadId: string }> }) {
   const { leadId } = await params;
-  return { title: `Audit · ${leadId} · CIMET QA Gate` };
+  return { title: `Audit · ${leadId} · VerityGate` };
 }
 
 export default async function AuditPage({ params }: { params: Promise<{ leadId: string }> }) {

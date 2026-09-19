@@ -1,4 +1,4 @@
-# CIMET AI QA Gate — backend
+# VerityGate — backend
 
 FastAPI + SQLAlchemy + SQLite. Implements the evaluation pipeline
 (ingest → normalize → extract → run checks → collect evidence → confidence

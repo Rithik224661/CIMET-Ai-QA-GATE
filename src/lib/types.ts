@@ -79,6 +79,11 @@ export interface Lead {
    * persisted `reason`/`ruleApplied` copy. Null/absent while `state` is
    * "processing" or "error" — never present on those states. */
   decision?: GateOutcome | null;
+  /** True only when the backend actually has playable audio bytes for
+   * this lead (backend/app/services/audio_storage.py) — drives whether
+   * the evidence player shows real playback or a truthful "unavailable"
+   * state. Never assume true. */
+  hasAudio?: boolean;
 }
 
 export interface GateDecision {

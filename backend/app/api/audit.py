@@ -26,6 +26,7 @@ def get_audit_ledger(lead_id: str, db: Session = Depends(get_db)):
                 actor=e.actor,
                 version=e.rule_version,
                 resulting_state=e.resulting_state,
+                metadata=e.event_metadata or None,
             )
             for e in events
         ]
@@ -33,4 +34,4 @@ def get_audit_ledger(lead_id: str, db: Session = Depends(get_db)):
 
 
 def _label(event_type: str) -> str:
-    return event_type.replace("_", " ").title().replace("Qa ", "QA ")
+    return event_type.replace("_", " ").title().replace("Qa ", "QA ").replace("Ai ", "AI ")

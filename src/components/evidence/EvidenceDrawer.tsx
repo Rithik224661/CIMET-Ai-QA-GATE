@@ -2,21 +2,49 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import clsx from "clsx";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Chip from "@/components/ui/Chip";
 import { buttonClass } from "@/components/ui/Button";
 import { HairlineCell, HairlineGrid } from "@/components/ui/StatGrid";
 import { confidenceTextClass, confidenceTone, formatConfidence, resultTone } from "@/lib/status";
+import { timestampToSeconds } from "@/lib/format";
 import { buildHref } from "@/lib/url";
 import type { CheckResult } from "@/lib/types";
 
 const CONF_BAR_CLASS = { strong: "bg-text-2", adequate: "bg-text-muted", low: "bg-review" } as const;
 
-export default function EvidenceDrawer({ results }: { results: CheckResult[] }) {
+function formatSeconds(total: number): string {
+  const mm = Math.floor(total / 60);
+  const ss = Math.floor(total % 60);
+  return `${mm}:${ss.toString().padStart(2, "0")}`;
+}
+
+export default function EvidenceDrawer({
+  results,
+  leadId,
+  hasAudio,
+}: {
+  results: CheckResult[];
+  leadId: string;
+  hasAudio: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // The <audio> element is mounted inside a Radix Dialog.Portal, which can
+  // commit its children a tick after the rest of this component's render —
+  // a plain useRef alone would leave the play-trigger effect below reading
+  // a still-null ref on its first run. `mounted` (state) exists purely to
+  // make the effect re-fire once the element actually attaches; the node
+  // itself stays a plain mutable ref (nodeRef) so imperative DOM calls
+  // (currentTime/play/pause) aren't flagged as mutating React state.
+  const nodeRef = useRef<HTMLAudioElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const audioElRef = useCallback((node: HTMLAudioElement | null) => {
+    nodeRef.current = node;
+    setMounted(node != null);
+  }, []);
 
   const checkCode = searchParams.get("check");
   const result = checkCode ? (results.find((r) => r.checkCode === checkCode) ?? null) : null;
@@ -26,16 +54,45 @@ export default function EvidenceDrawer({ results }: { results: CheckResult[] }) 
   // adjusted during render (React's documented pattern for this), not in an
   // effect, so opening the drawer via "Play evidence" never flashes closed
   // first. Once open, Play/Mark reviewed only touch local state.
-  const [playing, setPlaying] = useState(false);
+  const [playRequested, setPlayRequested] = useState(false);
   const [seededFor, setSeededFor] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audioError, setAudioError] = useState(false);
   if (checkCode !== seededFor) {
     setSeededFor(checkCode);
-    setPlaying(checkCode != null && searchParams.get("play") === "1");
+    setPlayRequested(checkCode != null && searchParams.get("play") === "1");
+    setAudioError(false);
   }
 
+  // Real playback against the backend's actual audio bytes — never a
+  // simulated "playing" animation (brief §6/§28: no fake success). Seeks
+  // to the evidence's real timestamp, then plays.
+  useEffect(() => {
+    const audio = nodeRef.current;
+    if (!audio || !mounted || !playRequested || !hasAudio || !result) return;
+    const seconds = timestampToSeconds(result.timestamp);
+    if (seconds != null) audio.currentTime = seconds;
+    audio.play().catch(() => setAudioError(true));
+    // Only re-seek when the drawer opens for a (possibly new) check, not
+    // on every re-render while already playing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, playRequested, checkCode, hasAudio]);
+
   function close() {
+    nodeRef.current?.pause();
     const current = Object.fromEntries(searchParams.entries());
     router.push(buildHref(pathname, current, { check: null, play: null }), { scroll: false });
+  }
+
+  function playFromEvidence() {
+    setAudioError(false);
+    setPlayRequested(true);
+    const audio = nodeRef.current;
+    if (!audio || !result) return;
+    const seconds = timestampToSeconds(result.timestamp);
+    if (seconds != null) audio.currentTime = seconds;
+    audio.play().catch(() => setAudioError(true));
   }
 
   const displayTs = result?.timestamp ?? "whole call";
@@ -126,17 +183,51 @@ export default function EvidenceDrawer({ results }: { results: CheckResult[] }) 
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2">
-                <button type="button" onClick={() => setPlaying(true)} className={buttonClass("primary")}>
-                  ▶ Play audio · {displayTs}
+                <button
+                  type="button"
+                  data-testid="play-evidence-button"
+                  disabled={!hasAudio}
+                  onClick={isPlaying ? () => nodeRef.current?.pause() : playFromEvidence}
+                  className={clsx(buttonClass("primary"), !hasAudio && "cursor-not-allowed opacity-40")}
+                >
+                  {!hasAudio ? "Audio unavailable" : isPlaying ? "⏸ Pause" : `▶ Play audio · ${displayTs}`}
                 </button>
                 <Dialog.Close className={buttonClass("secondary")}>Mark reviewed</Dialog.Close>
               </div>
 
-              {playing ? (
+              {hasAudio ? (
+                <audio
+                  ref={audioElRef}
+                  data-testid="evidence-audio"
+                  src={`/api/audio/${leadId}`}
+                  preload="none"
+                  className="hidden"
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => setIsPlaying(false)}
+                  onError={() => setAudioError(true)}
+                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                />
+              ) : null}
+
+              {audioError ? (
+                <div className="mt-4 border border-ring p-3.5">
+                  <span className="font-mono text-xs text-fail">
+                    Playback did not start — click Play audio to try again (some browsers block autoplay on
+                    navigation).
+                  </span>
+                </div>
+              ) : !hasAudio ? (
+                <div className="mt-4 border border-ring p-3.5">
+                  <span className="font-mono text-xs text-text-dim">
+                    No recording stored for this lead — evidence remains transcript-only.
+                  </span>
+                </div>
+              ) : isPlaying ? (
                 <div className="mt-4 flex items-center gap-2.5 border border-ring p-3.5">
                   <span className="block size-1.5 animate-qapulse rounded-full bg-accent" />
                   <span className="font-mono text-xs text-text-muted">
-                    Playing 20s from {displayTs} — card numbers redacted in this stream
+                    Playing from {formatSeconds(currentTime)} — card numbers redacted in this stream
                   </span>
                 </div>
               ) : null}

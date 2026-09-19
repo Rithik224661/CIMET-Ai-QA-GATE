@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CIMET QA Gate",
+  title: "VerityGate",
   description: "AI quality gate that scores sales calls against retailer checklists before CRM submission.",
 };
 

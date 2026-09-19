@@ -68,12 +68,12 @@ def record_ingest_events(db: Session, lead: Lead, *, recording_ok: bool) -> None
         )
 
 
-def _evaluate_check(check: Check, context: EvaluationContext) -> CheckOutcome:
+def _evaluate_check(check: Check, context: EvaluationContext, ai_behaviour_results: dict | None) -> CheckOutcome:
     if check.type == CheckType.VERBATIM:
         return evaluate_verbatim(check.config, context)
     if check.type == CheckType.FACTUAL:
         return evaluate_factual(check.config, context)
-    return evaluate_behaviour(check.config, context)
+    return evaluate_behaviour(check.config, context, ai_behaviour_results)
 
 
 def run_evaluation(db: Session, lead: Lead) -> GateDecision:
@@ -103,6 +103,39 @@ def run_evaluation(db: Session, lead: Lead) -> GateDecision:
     context = EvaluationContext(
         lead_id=lead.id, duration_sec=lead.duration_sec, segments=segments, crm_snapshot=lead.crm_snapshot or {}
     )
+
+    # One contextual AI call per lead (brief §37), not one per check — see
+    # ai_behaviour.evaluate_all_behaviour_metrics. Only attempted when a
+    # real provider is configured; AI_PROVIDER=none (the default) skips
+    # this entirely, so _evaluate_check below gets ai_behaviour_results=
+    # None and behaves exactly as it did before this existed.
+    ai_behaviour_results: dict | None = None
+    if settings.ai_provider != "none":
+        import time
+
+        from .ai_behaviour import evaluate_all_behaviour_metrics
+
+        t0 = time.monotonic()
+        ai_behaviour_results = evaluate_all_behaviour_metrics(context)
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        used = bool(ai_behaviour_results)
+        append_audit_event(
+            db,
+            lead_id=lead.id,
+            event_type=AuditEventType.AI_EVALUATION,
+            actor=f"AI behaviour layer · {settings.ai_provider}/{settings.anthropic_model}",
+            resulting_state="AI_USED" if used else "AI_FALLBACK",
+            metadata={
+                "provider": settings.ai_provider,
+                "model": settings.anthropic_model,
+                "used": used,
+                "latencyMs": latency_ms,
+                "metricsCovered": sorted(ai_behaviour_results.keys()) if ai_behaviour_results else [],
+                "fallbackReason": None
+                if used
+                else "provider returned no usable structured result for any metric — deterministic behaviour outcomes retained",
+            },
+        )
 
     # Accessing lead.results / lead.decision below both loads and CACHES
     # the relationship on the in-memory `lead` object. Simply db.add()-ing
@@ -138,7 +171,7 @@ def run_evaluation(db: Session, lead: Lead) -> GateDecision:
 
     for check in checks:
         try:
-            outcome = _evaluate_check(check, context)
+            outcome = _evaluate_check(check, context, ai_behaviour_results)
         except Exception:
             # An evaluator bug must never crash the whole lead's evaluation
             # (which would leave nothing scored at all) NOR silently pass

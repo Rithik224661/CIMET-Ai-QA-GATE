@@ -3,7 +3,7 @@ import RuleSetList from "@/components/rules/RuleSetList";
 import RuleTable from "@/components/rules/RuleTable";
 import { getChecksForRuleSet, getRuleSets } from "@/lib/data/rulesets";
 
-export const metadata = { title: "Rules · CIMET QA Gate" };
+export const metadata = { title: "Rules · VerityGate" };
 
 export default async function RulesPage({ searchParams }: { searchParams: Promise<{ set?: string }> }) {
   const sp = await searchParams;

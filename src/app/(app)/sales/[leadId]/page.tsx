@@ -11,6 +11,7 @@ import ChecklistTable from "@/components/sale/ChecklistTable";
 import HumanReviewForm from "@/components/sale/HumanReviewForm";
 import Lineage from "@/components/sale/Lineage";
 import EvidenceDrawer from "@/components/evidence/EvidenceDrawer";
+import EvaluationBar from "@/components/sale/EvaluationBar";
 import Processing from "@/components/states/Processing";
 import IngestError from "@/components/states/IngestError";
 import EmptyFindings from "@/components/states/EmptyFindings";
@@ -21,7 +22,7 @@ import { deriveFindings } from "@/lib/sale";
 
 export async function generateMetadata({ params }: { params: Promise<{ leadId: string }> }) {
   const { leadId } = await params;
-  return { title: `Sale QA · ${leadId} · CIMET QA Gate` };
+  return { title: `Sale QA · ${leadId} · VerityGate` };
 }
 
 export default async function SalePage({
@@ -52,6 +53,7 @@ export default async function SalePage({
           ) : gate ? (
             <>
               <DecisionHeader lead={lead} gate={gate} />
+              <EvaluationBar leadId={lead.id} evaluationId={gate.evaluationId} />
               {lead.override ? <OverrideBanner override={lead.override} /> : null}
 
               <SectionHeading title="Critical findings" trailing="evidence-backed · click to inspect" />
@@ -95,7 +97,7 @@ export default async function SalePage({
                 <Lineage leadId={lead.id} events={buildLineage(lead, gate)} />
               </div>
 
-              <EvidenceDrawer results={lead.results} />
+              <EvidenceDrawer results={lead.results} leadId={lead.id} hasAudio={!!lead.hasAudio} />
             </>
           ) : null}
         </div>

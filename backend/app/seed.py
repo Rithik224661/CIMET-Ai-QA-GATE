@@ -34,6 +34,7 @@ from .seed_data import (
     LeadSeed,
     generate_bulk_leads,
 )
+from .services.audio_storage import generate_demo_recording
 from .services.audit import append_audit_event
 from .services.pipeline import record_ingest_events, run_evaluation
 from .services.transcript import create_transcript
@@ -139,7 +140,7 @@ def _ingest_lead(db: Session, seed: LeadSeed, retailers: dict[str, Retailer], ch
             lead_id=lead.id,
             source="dialler_mock",
             duration_seconds=seed.duration_sec,
-            storage_reference=f"mock://recordings/{lead.id}.wav",
+            storage_reference=f"recordings/{lead.id}.wav",
             mime_type="audio/wav",
             processing_status="ready",
             created_at=dt.datetime.now(dt.UTC),
@@ -150,6 +151,13 @@ def _ingest_lead(db: Session, seed: LeadSeed, retailers: dict[str, Retailer], ch
         record_ingest_events(db, lead, recording_ok=True)
         db.flush()
         return lead
+
+    # Synthetic demo audio is only generated for the 9 named scenarios
+    # (is_seed_scenario) — the ~300 bulk backfill leads are never opened
+    # individually, so generating ~300 WAV files would be pure disk cost
+    # for zero demo value. See app/services/audio_storage.py.
+    if seed.scenario_tag:
+        generate_demo_recording(lead.id, seed.duration_sec, seed.turns)
 
     create_transcript(db, lead, seed.turns)
     record_ingest_events(db, lead, recording_ok=True)

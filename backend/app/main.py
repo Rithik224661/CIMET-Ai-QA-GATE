@@ -3,10 +3,10 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import audit, calibration, dashboard, evaluations, health, leads, reviews, rules
+from .api import audio, audit, calibration, dashboard, evaluations, health, leads, reviews, rules
 from .config import settings
 
-app = FastAPI(title="CIMET AI QA Gate API", version="0.1.0")
+app = FastAPI(title="VerityGate API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +24,7 @@ app.include_router(reviews.router)
 app.include_router(calibration.router)
 app.include_router(dashboard.router)
 app.include_router(audit.router)
+app.include_router(audio.router)
 
 
 @app.get("/")

@@ -4,7 +4,7 @@ import ConfidenceHistogram from "@/components/calibration/ConfidenceHistogram";
 import DisagreementBars from "@/components/calibration/DisagreementBars";
 import { getCalibrationMetrics } from "@/lib/data/calibration";
 
-export const metadata = { title: "Calibration · CIMET QA Gate" };
+export const metadata = { title: "Calibration · VerityGate" };
 
 export default async function CalibrationPage() {
   const { kpis, confidenceBuckets, confidenceBucketMax, disagreements, disagreementMax, sampledCallsTotal, sampledDisagreementsTotal } =

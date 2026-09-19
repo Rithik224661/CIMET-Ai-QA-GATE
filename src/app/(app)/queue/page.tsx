@@ -4,7 +4,7 @@ import QueueTable from "@/components/queue/QueueTable";
 import { DEMO_NOW } from "@/lib/fixtures/clock";
 import { ALL_RETAILERS, DEFAULT_QUEUE_FILTER, QUEUE_FILTERS, getQueueCounts, getQueueRows, type QueueFilter } from "@/lib/data/queue";
 
-export const metadata = { title: "QA Queue · CIMET QA Gate" };
+export const metadata = { title: "QA Queue · VerityGate" };
 
 function resolveFilter(value: string | undefined): QueueFilter {
   return (QUEUE_FILTERS as readonly string[]).includes(value ?? "") ? (value as QueueFilter) : DEFAULT_QUEUE_FILTER;

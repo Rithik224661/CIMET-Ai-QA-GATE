@@ -60,6 +60,7 @@ class IngestErrorOut(CamelModel):
 
 
 class GateOutcomeOut(CamelModel):
+    evaluation_id: int
     decision: str
     critical_fails: int
     low_confidence: int
@@ -97,6 +98,7 @@ class LeadOut(CamelModel):
     ingest_error: IngestErrorOut | None
     decision: GateOutcomeOut | None
     submission: SubmissionOut | None = None
+    has_audio: bool = False
 
 
 class LeadsListOut(CamelModel):
@@ -221,6 +223,7 @@ class AuditEventOut(CamelModel):
     actor: str
     version: str | None
     resulting_state: str
+    metadata: dict | None = None
 
 
 class AuditOut(CamelModel):
@@ -264,4 +267,7 @@ class HealthOut(CamelModel):
     database: str
     data_mode: str
     ai_provider: str
+    ai_provider_configured: bool
     seeded: bool
+    recordings_available: int
+    sandbox_configured: bool

@@ -85,6 +85,18 @@ def _verify_evidence(items: list[_AIEvidenceItem], context: EvaluationContext) -
     return verified
 
 
+def _strip_markdown_fence(text: str) -> str:
+    """Models sometimes wrap JSON in ```json ... ``` despite being asked
+    not to; strip that before parsing rather than treating it as
+    malformed output."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.strip("`")
+        if stripped.lower().startswith("json"):
+            stripped = stripped[4:]
+    return stripped.strip()
+
+
 def _call_ai(metric: str, check_config: dict, context: EvaluationContext) -> AIBehaviourResult | None:
     provider = get_llm_provider()
     prompt = (
@@ -96,7 +108,7 @@ def _call_ai(metric: str, check_config: dict, context: EvaluationContext) -> AIB
     if result is None:
         return None
     try:
-        return AIBehaviourResult.model_validate(json.loads(result.value))
+        return AIBehaviourResult.model_validate(json.loads(_strip_markdown_fence(result.value)))
     except (json.JSONDecodeError, ValidationError, TypeError):
         logger.warning("AI behaviour evaluator returned unparseable/invalid output for metric=%s", metric)
         return None
@@ -126,21 +138,92 @@ def _combine(deterministic: CheckOutcome, ai: AIBehaviourResult) -> CheckOutcome
     return replace(deterministic, confidence=combined_confidence, rationale=rationale)
 
 
+_COMBINED_SCHEMA_DESCRIPTION = (
+    'JSON object with exactly these 3 keys: "rapport", "interruptions", "objection_handling". '
+    "Each value is an object: "
+    '{"status": "PASS"|"FAIL"|"LOW_CONFIDENCE", "confidence": 0.0-1.0, "signals": [string, ...], '
+    '"evidence": [{"segmentId": int, "quote": string}, ...], "rationale": string}. '
+    "evidence.segmentId and evidence.quote MUST correspond exactly to a transcript segment you were given below "
+    "— never invent a quotation or a segment id. If you cannot assess a metric, still return an object for it "
+    'with "status": "LOW_CONFIDENCE" and a low confidence value rather than omitting the key.'
+)
+
+
+def evaluate_all_behaviour_metrics(context: EvaluationContext) -> dict[str, AIBehaviourResult]:
+    """One contextual call per lead covering all 3 AI-eligible behaviour
+    metrics together (brief §37: "do not run an LLM call once per check if
+    one contextual call can safely evaluate the relevant semantic
+    behaviours"), instead of the 3 separate per-check calls a naive
+    integration would make. Called once from pipeline.py's run_evaluation()
+    before the per-check loop; its result is threaded down to each
+    eligible check via `maybe_refine_with_ai`'s `precomputed` argument.
+
+    Returns {} (never None) on any failure — including AI_PROVIDER=none —
+    so callers can use dict.get(metric) uniformly and always fall back to
+    the deterministic outcome for a metric with no entry."""
+    provider = get_llm_provider()
+    if isinstance(provider, NullLLMProvider):
+        return {}
+
+    prompt = (
+        "Assess THREE non-critical, coaching-only behavioural signals in this sales call transcript: rapport, "
+        "interruptions, and objection handling. These are never compliance checks — never claim more certainty "
+        "than the transcript actually supports; use LOW_CONFIDENCE whenever the evidence is ambiguous."
+    )
+    try:
+        result = provider.evaluate_structured(
+            prompt=prompt, schema_description=_COMBINED_SCHEMA_DESCRIPTION, context=_build_context_text(context)
+        )
+    except Exception:
+        logger.exception("AI behaviour evaluator raised during combined multi-metric call for lead=%s", context.lead_id)
+        return {}
+
+    if result is None:
+        return {}
+
+    try:
+        raw = json.loads(_strip_markdown_fence(result.value))
+        parsed: dict[str, AIBehaviourResult] = {}
+        for metric in ("rapport", "interruptions", "objection_handling"):
+            if metric in raw:
+                parsed[metric] = AIBehaviourResult.model_validate(raw[metric])
+        return parsed
+    except (json.JSONDecodeError, ValidationError, TypeError, AttributeError):
+        logger.warning("AI behaviour evaluator returned unparseable/invalid combined output for lead=%s", context.lead_id)
+        return {}
+
+
+_NO_PRECOMPUTED = object()  # distinct from "combined call ran, had nothing for this metric" (None)
+
+
 def maybe_refine_with_ai(
-    metric: str, check_config: dict, context: EvaluationContext, deterministic_outcome: CheckOutcome
+    metric: str,
+    check_config: dict,
+    context: EvaluationContext,
+    deterministic_outcome: CheckOutcome,
+    precomputed: AIBehaviourResult | None = _NO_PRECOMPUTED,  # type: ignore[assignment]
 ) -> CheckOutcome:
     provider = get_llm_provider()
     if isinstance(provider, NullLLMProvider):
         return deterministic_outcome  # the default, zero-cost path — no network call
 
-    try:
-        ai_result = _call_ai(metric, check_config, context)
-    except Exception:
-        # A provider exception (timeout, network error, whatever) must
-        # degrade to the deterministic result, never crash the check and
-        # never silently produce a PASS.
-        logger.exception("AI behaviour evaluator raised for metric=%s", metric)
-        return deterministic_outcome
+    if precomputed is not _NO_PRECOMPUTED:
+        # Reuse the single per-lead combined call (evaluate_all_behaviour_
+        # metrics) instead of making a second network call for this metric.
+        # `None` here means the combined call ran but had nothing for this
+        # metric — that must fall through to the deterministic outcome
+        # below, NOT trigger an individual per-metric call (that would
+        # defeat the whole point of consolidating to one call per lead).
+        ai_result = precomputed
+    else:
+        try:
+            ai_result = _call_ai(metric, check_config, context)
+        except Exception:
+            # A provider exception (timeout, network error, whatever) must
+            # degrade to the deterministic result, never crash the check and
+            # never silently produce a PASS.
+            logger.exception("AI behaviour evaluator raised for metric=%s", metric)
+            return deterministic_outcome
 
     if ai_result is None:
         return deterministic_outcome

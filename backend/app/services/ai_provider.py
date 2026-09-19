@@ -77,11 +77,17 @@ class AnthropicLLMProvider:
             client = anthropic.Anthropic(api_key=self._api_key)
             message = client.messages.create(
                 model=self._model,
-                max_tokens=512,
+                # 1024 rather than the previous 512: the behaviour layer's
+                # combined per-lead call (ai_behaviour.evaluate_all_
+                # behaviour_metrics) asks for 3 metrics' worth of JSON —
+                # status/confidence/signals/evidence/rationale each — in
+                # one response, per brief §37 ("one contextual call").
+                max_tokens=1024,
                 system=(
                     "You extract a single structured value from a call transcript excerpt. "
                     f"Output schema: {schema_description}. "
-                    "If the value is not clearly present, respond with exactly: NOT_FOUND."
+                    "If the value is not clearly present, respond with exactly: NOT_FOUND. "
+                    "Respond with ONLY the JSON — no prose, no markdown code fences."
                 ),
                 messages=[{"role": "user", "content": f"{prompt}\n\nTranscript context:\n{context}"}],
             )

@@ -1,6 +1,7 @@
 {
-  "name": "cimet-qa-gate",
+  "name": "veritygate",
   "version": "0.1.0",
+  "description": "Evidence-backed AI sales QA decisioning platform for the CIMET AI Hiring Hackathon 2026",
   "private": true,
   "scripts": {
     "dev": "next dev",
