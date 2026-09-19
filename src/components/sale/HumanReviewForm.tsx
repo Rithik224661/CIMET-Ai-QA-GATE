@@ -4,6 +4,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { buttonClass } from "@/components/ui/Button";
 import type { Decision } from "@/lib/types";
+import { submitOverride } from "@/lib/actions/review";
 
 interface SavedReview {
   choice: string;
@@ -12,27 +13,47 @@ interface SavedReview {
 
 /**
  * Local, transient form state (CLAUDE.md: "only form and playback state is
- * local"). Confirming shows the audit-event confirmation panel below —
- * Phase 3 wires this to a server action that actually appends a
- * HumanReview + AuditEvent row; today it demonstrates the shape without
- * persistence. It never replaces the AI decision shown above it.
+ * local"). Confirming calls the submitOverride server action, which
+ * appends a HumanReview + AuditEvent row on the backend — the AI decision
+ * above it is never mutated or hidden (CLAUDE.md #7).
  */
-export default function HumanReviewForm({ decision, decisionLabel }: { decision: Decision; decisionLabel: string }) {
+export default function HumanReviewForm({
+  leadId,
+  decision,
+  decisionLabel,
+}: {
+  leadId: string;
+  decision: Decision;
+  decisionLabel: string;
+}) {
   const [choice, setChoice] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [saved, setSaved] = useState<SavedReview | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const overrideValue = decision === "AUTO_SUBMIT" ? "HOLD" : "PASS";
+  // Binary flip: "agree" keeps the AI's implied pass/hold, "override" flips it.
+  const agreeValue: "PASS" | "HOLD" = decision === "AUTO_SUBMIT" ? "PASS" : "HOLD";
+  const overrideValue: "PASS" | "HOLD" = decision === "AUTO_SUBMIT" ? "HOLD" : "PASS";
   const overrideLabel = decision === "AUTO_SUBMIT" ? "Override → HOLD" : "Override → PASS";
   const options = [
     { label: "Agree with AI", value: decisionLabel },
     { label: overrideLabel, value: overrideValue },
   ];
 
-  const canConfirm = !!choice && reason.trim().length > 3;
+  const canConfirm = !!choice && reason.trim().length > 3 && !submitting;
 
-  function confirm() {
+  async function confirm() {
     if (!canConfirm || !choice) return;
+    setSubmitting(true);
+    setError(null);
+    const humanDecision: "PASS" | "HOLD" = choice === decisionLabel ? agreeValue : overrideValue;
+    const result = await submitOverride({ leadId, humanDecision, reason });
+    setSubmitting(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setSaved({ choice, reason });
   }
 
@@ -80,9 +101,16 @@ export default function HumanReviewForm({ decision, decisionLabel }: { decision:
         className="w-full resize-y border border-ring bg-bg p-2.5 font-mono text-xs text-text-2 focus-visible:outline-2 focus-visible:outline-accent"
       />
 
-      <button type="button" onClick={confirm} disabled={!canConfirm} className={buttonClass(canConfirm ? "primary" : "secondary", "mt-3 w-full justify-center disabled:border-0 disabled:bg-chip-bg disabled:text-text-dim")}>
-        Confirm decision
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={!canConfirm}
+        className={buttonClass(canConfirm ? "primary" : "secondary", "mt-3 w-full justify-center disabled:border-0 disabled:bg-chip-bg disabled:text-text-dim")}
+      >
+        {submitting ? "Submitting…" : "Confirm decision"}
       </button>
+
+      {error ? <p className="mt-2 font-mono text-xs text-fail">{error}</p> : null}
 
       {saved ? (
         <div className="mt-3.5 animate-qaslide border border-accent bg-bg px-3.5 py-3">

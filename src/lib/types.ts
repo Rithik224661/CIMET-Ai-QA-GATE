@@ -4,6 +4,8 @@
  * lib/fixtures/ populates them for Phase 1 (UI on fixtures).
  */
 
+import type { GateOutcome } from "./gate";
+
 export type Decision = "AUTO_SUBMIT" | "HOLD" | "QA_REVIEW";
 export type CheckType = "Verbatim" | "Factual" | "Behaviour";
 export type ResultStatus = "PASS" | "FAIL" | "REVIEW";
@@ -73,6 +75,10 @@ export interface Lead {
     retry: string;
     at: string;
   } | null;
+  /** Backend-computed gate outcome (GateOutcomeDTO), including the
+   * persisted `reason`/`ruleApplied` copy. Null/absent while `state` is
+   * "processing" or "error" — never present on those states. */
+  decision?: GateOutcome | null;
 }
 
 export interface GateDecision {

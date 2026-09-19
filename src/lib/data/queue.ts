@@ -1,4 +1,5 @@
-import { gateForLead, getLeads } from "./leads";
+import { apiGet } from "../api/client";
+import { gateForLead } from "./leads";
 import { relativeAge } from "../format";
 import { decisionLabel } from "../status";
 import type { Decision, Lead } from "../types";
@@ -25,10 +26,14 @@ export interface QueueRow {
   decision: Decision | "ERROR";
 }
 
-function matchesRetailer(lead: Lead, retailer: string): boolean {
-  return retailer === ALL_RETAILERS || lead.retailer === retailer;
-}
-
+/**
+ * Client-side re-derivation of the "which filter bucket does this lead fall
+ * into" predicate, used only to compute all 6 filter counts from a single
+ * unfiltered-by-filter payload (see getQueueCounts below). The backend now
+ * owns this matching for the actual queue listing (getQueueRows passes
+ * `filter`/`retailer` through as query params) — this copy mirrors that
+ * same logic so counts don't require 6 round trips.
+ */
 function matchesFilter(lead: Lead, filter: QueueFilter): boolean {
   if (filter === "All") return lead.state === "scored" || lead.state === "error";
   if (lead.state !== "scored") return false;
@@ -62,34 +67,40 @@ function decidingConfidenceFor(lead: Lead): number | null {
   return Math.min(...deciding.map((r) => r.confidence));
 }
 
+async function fetchLeads(opts: { retailer?: string; filter?: string }): Promise<Lead[]> {
+  const { leads } = await apiGet<{ leads: Lead[] }>("/api/leads", {
+    retailer: opts.retailer,
+    filter: opts.filter,
+  });
+  return leads;
+}
+
 export async function getQueueRows(opts: { retailer: string; filter: QueueFilter; now: Date }): Promise<QueueRow[]> {
-  const leads = await getLeads();
-  return leads
-    .filter((l) => matchesRetailer(l, opts.retailer) && matchesFilter(l, opts.filter))
-    .map((lead) => {
-      const gate = gateForLead(lead);
-      const decision: Decision | "ERROR" = lead.state === "error" ? "ERROR" : gate ? gate.decision : "AUTO_SUBMIT";
-      return {
-        lead,
-        reason: reasonFor(lead),
-        decidingConfidence: decidingConfidenceFor(lead),
-        age: relativeAge(lead.callDate, opts.now),
-        displayDecision: lead.state === "error" ? "ERROR" : decisionLabel(gate!.decision),
-        decision,
-      };
-    });
+  const leads = await fetchLeads({ retailer: opts.retailer, filter: opts.filter });
+  return leads.map((lead) => {
+    const gate = gateForLead(lead);
+    const decision: Decision | "ERROR" = lead.state === "error" ? "ERROR" : gate ? gate.decision : "AUTO_SUBMIT";
+    return {
+      lead,
+      reason: reasonFor(lead),
+      decidingConfidence: decidingConfidenceFor(lead),
+      age: relativeAge(lead.callDate, opts.now),
+      displayDecision: lead.state === "error" ? "ERROR" : decisionLabel(gate!.decision),
+      decision,
+    };
+  });
 }
 
 export async function getQueueCounts(retailer: string): Promise<Record<QueueFilter, number>> {
-  const leads = await getLeads();
+  const leads = await fetchLeads({ retailer });
   const counts = {} as Record<QueueFilter, number>;
   for (const filter of QUEUE_FILTERS) {
-    counts[filter] = leads.filter((l) => matchesRetailer(l, retailer) && matchesFilter(l, filter)).length;
+    counts[filter] = leads.filter((l) => matchesFilter(l, filter)).length;
   }
   return counts;
 }
 
 export async function getQueueBadgeCount(retailer: string): Promise<number> {
-  const leads = await getLeads();
-  return leads.filter((l) => matchesRetailer(l, retailer) && (l.state === "scored" || l.state === "error")).length;
+  const leads = await fetchLeads({ retailer });
+  return leads.filter((l) => l.state === "scored" || l.state === "error").length;
 }
