@@ -27,9 +27,16 @@ export interface GateOutcome {
 }
 
 /**
- * The gate: criticalFails > 0 → HOLD; anyConfidence < floor → QA_REVIEW;
- * else AUTO_SUBMIT. Pure and deterministic — never an LLM call. See
- * CLAUDE.md non-negotiable #6 and design_handoff/NEXTJS_BUILD_PLAN.md §6.4.
+ * The gate: criticalFails > 0 → HOLD; any check's confidence < floor →
+ * QA_REVIEW; else AUTO_SUBMIT. Pure and deterministic — never an LLM
+ * call. Scoped to ANY check per the CIMET spec's literal text ("low
+ * confidence on any check — routed to QA rather than auto-passed") —
+ * see backend/app/services/gate.py's docstring, the authoritative
+ * implementation this one mirrors, for why an earlier critical-only
+ * reading was corrected back. A low-confidence non-critical check still
+ * can never produce a HOLD, only QA_REVIEW — it's a human look, not a
+ * block. See CLAUDE.md non-negotiable #6 and
+ * design_handoff/NEXTJS_BUILD_PLAN.md §6.4.
  */
 export function evaluateGate(
   checks: readonly GateInput[],
@@ -73,7 +80,7 @@ export function describeDecision(
 
   if (decision === "QA_REVIEW") {
     return lowConfidence === 1
-      ? "Insufficient confidence on a critical check. Never auto-passed."
+      ? "Insufficient confidence on a check. Never auto-passed."
       : `Insufficient confidence on ${lowConfidence} checks. Never auto-passed.`;
   }
 

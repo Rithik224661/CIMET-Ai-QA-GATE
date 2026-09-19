@@ -14,6 +14,7 @@ from .schemas import (
     HumanOverrideOut,
     IngestErrorOut,
     LeadOut,
+    SubmissionOut,
     TranscriptTurnOut,
 )
 
@@ -71,6 +72,16 @@ def _latest_review(lead: models.Lead) -> models.HumanReview | None:
     return lead.reviews[-1] if lead.reviews else None
 
 
+def serialize_submission(submission: models.Submission) -> SubmissionOut:
+    return SubmissionOut(
+        id=submission.id,
+        status=submission.status,
+        sandbox=submission.payload.get("sandbox", "DEMO_MOCK"),
+        submitted_at=submission.submitted_at.strftime("%Y-%m-%d %H:%M:%S"),
+        payload=submission.payload,
+    )
+
+
 def serialize_override(review: models.HumanReview) -> HumanOverrideOut:
     return HumanOverrideOut(
         ai_decision=review.ai_decision,
@@ -108,4 +119,5 @@ def serialize_lead(lead: models.Lead) -> LeadOut:
             else None
         ),
         decision=serialize_gate_decision(lead.decision) if lead.decision else None,
+        submission=serialize_submission(lead.submission_record) if lead.submission_record else None,
     )
