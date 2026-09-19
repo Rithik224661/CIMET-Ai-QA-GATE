@@ -55,10 +55,11 @@ describe("evaluateGate", () => {
     expect(outcome.lowConfidence).toBe(1);
   });
 
-  it("a low-confidence NON-critical check does NOT route to QA_REVIEW — coaching signal, never blocking", () => {
+  it("a low-confidence NON-critical check still routes to QA_REVIEW (any check, per spec) but never HOLD", () => {
     const outcome = evaluateGate([check({ critical: false, status: "PASS", confidence: 0.5 })]);
-    expect(outcome.decision).toBe("AUTO_SUBMIT");
-    expect(outcome.lowConfidence).toBe(0);
+    expect(outcome.decision).toBe("QA_REVIEW");
+    expect(outcome.lowConfidence).toBe(1);
+    expect(outcome.criticalFails).toBe(0);
   });
 
   it("treats confidence exactly at the floor as NOT low (boundary is exclusive)", () => {
@@ -115,12 +116,12 @@ describe("describeDecision", () => {
 
   it("describes QA_REVIEW for a single low-confidence check", () => {
     const outcome = evaluateGate([check({ confidence: 0.5 })]);
-    expect(describeDecision(outcome)).toBe("Insufficient confidence on a critical check. Never auto-passed.");
+    expect(describeDecision(outcome)).toBe("Insufficient confidence on a check. Never auto-passed.");
   });
 
-  it("describes QA_REVIEW for multiple low-confidence critical checks", () => {
-    const outcome = evaluateGate([check({ confidence: 0.5 }), check({ confidence: 0.5, critical: true })]);
-    expect(describeDecision(outcome)).toBe("Insufficient confidence on 2 critical checks. Never auto-passed.");
+  it("describes QA_REVIEW for multiple low-confidence checks, critical or not", () => {
+    const outcome = evaluateGate([check({ confidence: 0.5 }), check({ confidence: 0.5, critical: false })]);
+    expect(describeDecision(outcome)).toBe("Insufficient confidence on 2 checks. Never auto-passed.");
   });
 
   it("describes a clean AUTO_SUBMIT", () => {

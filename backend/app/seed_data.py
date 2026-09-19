@@ -99,6 +99,8 @@ def common_turns(
     move_in_day: str | None = "24",
     email_value: str | None = "j.smith@gmail.com",
     gift_card_line: str | None = None,
+    objection: str | None = None,
+    objection_response: str | None = None,
     tcs: bool = True,
     eic: bool = True,
     cooling_off: bool = True,
@@ -132,12 +134,22 @@ def common_turns(
     if dmo_mode == "pass":
         turns.append(TurnSeed("AGENT", 595, DMO_PHRASE + "."))
     elif dmo_mode == "crosstalk":
+        # Genuine overlapping timestamps (not just a text marker): the
+        # customer's turn starts before the agent's turn ends, a real,
+        # directly-measurable 2.0s overlap — the primary signal the
+        # interruptions evaluator looks for.
         turns.append(
             TurnSeed(
-                "AGENT", 588, "The Default Market Offer for your [crosstalk] compared to the plan we discussed…", kind="review"
+                "AGENT", 588, "The Default Market Offer for your [crosstalk] compared to the plan we discussed…",
+                kind="review", end=595.0,
             )
         )
-        turns.append(TurnSeed("CUSTOMER", 606, "Sorry — say that again, the line dropped out for a second.", kind="review"))
+        turns.append(
+            TurnSeed(
+                "CUSTOMER", 593.0, "Sorry — say that again, the line dropped out for a second.",
+                kind="review", end=598.0,
+            )
+        )
     # dmo_mode == "absent": no DMO turn at all
 
     if rate_value is not None:
@@ -163,6 +175,11 @@ def common_turns(
 
     if gift_card_line is not None:
         turns.append(TurnSeed("AGENT", 1450, gift_card_line))
+
+    if objection is not None:
+        turns.append(TurnSeed("CUSTOMER", 1230, objection, kind="note"))
+        if objection_response is not None:
+            turns.append(TurnSeed("AGENT", 1245, objection_response))
 
     if tcs:
         turns.append(TurnSeed("AGENT", 1540, TCS_PHRASE + "."))
@@ -256,7 +273,11 @@ LEADS: list[LeadSeed] = [
         call_datetime=_dt(_CALL_BASE_DATE, "10:05"),
         duration_sec=1700,
         state="scored",
-        turns=common_turns(disclaimer_start=10, dead_air_seconds=38, dead_air_start="12:14", dead_air_end="12:52"),
+        turns=common_turns(
+            disclaimer_start=10, dead_air_seconds=38, dead_air_start="12:14", dead_air_end="12:52",
+            objection="Actually, that sounds too expensive for what we're using right now.",
+            objection_response="I understand — let me show you the lower-usage plan that would cut that down.",
+        ),
     ),
     LeadSeed(
         id="3613766",

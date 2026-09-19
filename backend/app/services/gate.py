@@ -11,17 +11,19 @@ Mirrors frontend src/lib/gate.ts's shape and precedence (kept as a pure,
 unit-tested reference implementation — not on the live decision path, see
 src/lib/data/leads.ts's gateForLead()).
 
-Low confidence is scoped to CRITICAL checks only: a non-critical
-behavioural heuristic (rapport, interruptions, objection handling) being
-honestly uncertain is coaching signal, never a reason to escalate a call a
-human didn't need to see — brief §15 "never critical, never blocking" and
-§20's gate pseudocode ("any APPLICABLE CRITICAL check = LOW_CONFIDENCE").
-A critical check that could not be evaluated at all is represented as
-REVIEW status + confidence below the floor (see evaluators/base.py's
-`not_evaluable_outcome`), which routes here identically to a low-confidence
-PASS/FAIL — "not evaluable" and "low confidence" collapse into the same
-mechanism deliberately, per brief §10's "required checks incomplete/not
-evaluable -> QA_REVIEW".
+Low confidence is scoped to ANY check, critical or not — this is the
+CIMET spec's literal rule ("low confidence on any check — routed to QA
+rather than auto-passed") and is treated as authoritative over an earlier,
+narrower reading of this codebase that scoped it to critical checks only
+(see docs/DECISIONS.md's "Phase 4" section for why that reading was
+corrected back). The practical consequence: every check — including the
+non-critical Behaviour heuristics — must report a confidence that's
+genuinely >= the floor whenever it has nothing concerning to report,
+because a low-confidence PASS still routes here exactly like a
+low-confidence FAIL or a not-evaluable REVIEW. This does NOT make
+Behaviour checks "critical" — a low-confidence non-critical check still
+can't produce a HOLD, only a QA_REVIEW (a human look, not a block) — see
+`describe_decision` and `critical_fails` below, which are unaffected.
 """
 
 from __future__ import annotations
@@ -50,11 +52,12 @@ class GateOutcome:
 
 
 def evaluate_gate(checks: list[GateCheckInput]) -> GateOutcome:
-    """criticalFails > 0 -> HOLD; any CRITICAL check's confidence < floor ->
-    QA_REVIEW; else AUTO_SUBMIT. Non-critical confidence never gates the
-    decision — see module docstring."""
+    """criticalFails > 0 -> HOLD; any check's confidence < floor ->
+    QA_REVIEW; else AUTO_SUBMIT. A low-confidence non-critical check still
+    cannot produce a HOLD — only QA_REVIEW, and only when no critical
+    check has already failed (HOLD takes precedence either way)."""
     critical_fails = sum(1 for c in checks if c.critical and c.status == ResultStatus.FAIL)
-    low_confidence = sum(1 for c in checks if c.critical and c.confidence < settings.confidence_floor)
+    low_confidence = sum(1 for c in checks if c.confidence < settings.confidence_floor)
     non_critical_fails = sum(1 for c in checks if not c.critical and c.status == ResultStatus.FAIL)
     critical_checks = sum(1 for c in checks if c.critical)
 
@@ -77,7 +80,7 @@ def evaluate_gate(checks: list[GateCheckInput]) -> GateOutcome:
 
 _GATE_RULES = {
     Decision.AUTO_SUBMIT: "Gate rule: all criticals pass → submit without human touch.",
-    Decision.QA_REVIEW: "Gate rule: low confidence on any critical check → route to QA, never auto-pass.",
+    Decision.QA_REVIEW: "Gate rule: low confidence on any check → route to QA, never auto-pass.",
     Decision.HOLD: "Gate rule: any critical fail → hold, route to the TL queue.",
 }
 
@@ -100,8 +103,8 @@ def describe_decision(outcome: GateOutcome, *, repeat_offence: bool = False, ove
 
     if outcome.decision == Decision.QA_REVIEW:
         if outcome.low_confidence == 1:
-            return "Insufficient confidence on a critical check. Never auto-passed."
-        return f"Insufficient confidence on {outcome.low_confidence} critical checks. Never auto-passed."
+            return "Insufficient confidence on a check. Never auto-passed."
+        return f"Insufficient confidence on {outcome.low_confidence} checks. Never auto-passed."
 
     base = (
         f"All {outcome.critical_checks} critical checks passed."

@@ -1,76 +1,85 @@
-# Check audit — Phase 3 hardening
+# Check audit
 
 Full audit of all 20 configured checks in the one checklist export in hand
-(Retailer 1, Energy, v1.4). Produced before touching code, per the Phase 3
-hardening prompt's requirement to inspect the repository first rather than
-assume passing tests prove correctness.
+(Retailer 1, Energy, v1.4). First produced in Phase 3 (rubric closure /
+false-pass elimination); updated in Phase 4 (behaviour intelligence + AI
+augmentation) with the AI-used and gate-effect columns and the enhanced
+Behaviour signals. Describes what the code actually does — no marketing
+language.
 
-**Before this pass:** 6/20 checks had real evaluator logic; 14/20 silently
-returned `PASS` with a fabricated default confidence whenever no
-field/pattern was configured — the exact "dangerous pass-through" pattern
-this audit exists to eliminate.
-
-**After this pass:** 20/20 checks resolve to a real, structured evaluator
-strategy. Nothing in the catalogue relies on the old silent-PASS fallback
-path anymore (it still exists in code as a defensive fallback — see
-`not_evaluable_outcome` — but is dead code against the current 20-check
-catalogue; a `NOT_EVALUABLE` result is now REVIEW + confidence below the
-floor, never PASS).
-
-| # | Check | Type | Critical | Evaluation strategy | Real / Pass-through | Tested | Evidence | Risk (before) | Action |
+| # | Check | Type | Critical? | Implementation | AI used? | Evidence? | Confidence? | Gate effect | Tested? |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Recording disclaimer | Verbatim | **Yes** | Normalized text similarity vs. approved phrase, 0–60s window | Real (unchanged) | ✅ | ✅ | none | kept |
-| 2 | Account holder confirmed | Factual (presence) | **Yes** | Presence-match a customer confirmation phrase, 0–400s | **Real (new)** | ✅ | ✅ | **High** — was silent PASS | Implemented; absence → NOT_EVALUABLE (REVIEW), never FAIL or PASS |
-| 3 | Address match | Factual | **Yes** | Regex-extracted address vs. CRM, exact-match | Real (unchanged) | ✅ | ✅ | none | kept |
-| 4 | DOB match | Factual | **Yes** | Regex-extracted date vs. CRM | **Real (new)** | ✅ | ✅ | **High** | Implemented |
-| 5 | Fuel type | Factual | **Yes** | Keyword-extracted fuel type vs. CRM | **Real (new)** | ✅ | ✅ | **High** | Implemented |
-| 6 | NMI / MIRN verified | Factual | **Yes** | Digit-run regex vs. CRM | **Real (new)** | ✅ | ✅ | **High** | Implemented |
-| 7 | DMO read verbatim | Verbatim | **Yes** | Normalized similarity; crosstalk → REVIEW | Real (unchanged) | ✅ | ✅ | none | kept |
-| 8 | Rates and charges | Factual | **Yes** | Numeric extraction, 0c tolerance vs. rate card | Real (unchanged) | ✅ | ✅ | none | kept |
-| 9 | Concession applied | Factual | No | `skip_if_absent`: PASS is correct when nothing was offered; keyword-compare when the CRM flag is set | **Real (new)** | ✅ | ✅ (N/A-safe) | Medium | Implemented conditional not-applicable |
-| 10 | Life support declared | Factual (presence) | **Yes** | Presence-match the *customer's answer* (not just the agent asking), 1000–1060s | **Real (new)** | ✅ | ✅ | **High** | Implemented; asked-but-unanswered → NOT_EVALUABLE |
-| 11 | Dead air | Behaviour | No | Silence-duration regex vs. threshold | Real (unchanged) | ✅ | ✅ | none | kept |
-| 12 | Move-in date | Factual | No | Regex-extracted day vs. CRM | **Real (new)** | ✅ | ✅ | Medium | Implemented |
-| 13 | Email captured | Factual | **Yes** | Regex-extracted email, normalized, vs. CRM | Real (unchanged) | ✅ | ✅ | none | kept |
-| 14 | Gift card value | Factual | No | `skip_if_absent`: PASS is correct when no gift card on this plan; numeric-compare when the CRM value is set | **Real (new)** | ✅ | ✅ (N/A-safe) | Medium | Implemented conditional not-applicable |
-| 15 | T&Cs read | Verbatim | **Yes** | Normalized similarity vs. approved phrase | **Real (new)** | ✅ | ✅ | **High** | Implemented |
-| 16 | EIC provided | Verbatim | No | Normalized similarity vs. approved phrase | **Real (new)** | ✅ | ✅ | Medium | Implemented |
-| 17 | Cooling-off rights | Verbatim | **Yes** | Normalized similarity vs. approved phrase | **Real (new)** | ✅ | ✅ | **High** | Implemented |
-| 18 | Rapport | Behaviour | No | Customer/agent talk-time share (real, honestly heuristic-limited) | **Real, heuristic-limited (new)** | ✅ | partial (aggregate, no single quotable span) | Medium | Implemented documented heuristic — NOT an LLM call, NOT a fabricated sentiment score |
-| 19 | Interruptions | Behaviour | No | Crosstalk-marker count (real, honestly heuristic-limited) | **Real, heuristic-limited (new)** | ✅ | ✅ | Medium | Implemented documented heuristic |
-| 20 | Objection handling | Behaviour | No | Objection-keyword + agent-follow-up detection (real, honestly heuristic-limited) | **Real, heuristic-limited (new)** | ✅ | ✅ | Medium | Implemented documented heuristic |
+| 1 | Recording disclaimer | Verbatim | **Yes** | Normalized text similarity vs. approved phrase, 0–60s window | No | Yes (transcript span) | Similarity-derived | FAIL → HOLD | ✅ |
+| 2 | Account holder confirmed | Factual (presence) | **Yes** | Presence-match a customer confirmation phrase, 0–400s | No | Yes when found | Fixed high on match; sub-floor REVIEW when absent | Absent → QA_REVIEW (never FAIL on a keyword miss) | ✅ |
+| 3 | Address match | Factual | **Yes** | Regex-extracted address vs. CRM, exact-match | No | Yes | Extraction-derived | FAIL → HOLD | ✅ |
+| 4 | DOB match | Factual | **Yes** | Regex-extracted date vs. CRM, text-normalized compare | No | Yes | Extraction-derived | FAIL → HOLD | ✅ |
+| 5 | Fuel type | Factual | **Yes** | Keyword extraction vs. CRM | No | Yes | Extraction-derived | FAIL → HOLD | ✅ |
+| 6 | NMI / MIRN verified | Factual | **Yes** | Digit-run regex vs. CRM | No | Yes | Extraction-derived | FAIL → HOLD | ✅ |
+| 7 | DMO read verbatim | Verbatim | **Yes** | Normalized similarity; crosstalk → REVIEW | No | Yes | Similarity-derived; sub-floor on crosstalk | REVIEW+low-conf → QA_REVIEW | ✅ |
+| 8 | Rates and charges | Factual | **Yes** | Numeric extraction, 0c tolerance vs. rate card | No | Yes | Extraction-derived | FAIL → HOLD | ✅ |
+| 9 | Concession applied | Factual | No | `skip_if_absent`: correct PASS when nothing was offered; keyword-compare when the CRM flag is set | No | Yes when applicable | Fixed / extraction-derived | Any status → coaching only, never blocks | ✅ |
+| 10 | Life support declared | Factual (presence) | **Yes** | Presence-match the customer's *answer* (not just the agent asking), 1000–1060s | No | Yes when found | Fixed high on match; sub-floor REVIEW when unanswered | Unanswered → QA_REVIEW | ✅ |
+| 11 | Dead air | Behaviour | No | Silence-duration regex vs. threshold | No (not AI-eligible — hard duration threshold) | Yes | Fixed (0.94) | Low confidence here can route to QA_REVIEW (any-check scoping) but never HOLD | ✅ |
+| 12 | Move-in date | Factual | No | Regex-extracted day vs. CRM | No | Yes | Extraction-derived | Coaching only | ✅ |
+| 13 | Email captured | Factual | **Yes** | Regex-extracted email, normalized, vs. CRM | No | Yes | Extraction-derived | FAIL → HOLD | ✅ |
+| 14 | Gift card value | Factual | No | `skip_if_absent`: correct PASS when no gift card on this plan; numeric-compare when the CRM value is set | No | Yes when applicable | Fixed / extraction-derived | Coaching only | ✅ |
+| 15 | T&Cs read | Verbatim | **Yes** | Normalized similarity vs. approved phrase | No | Yes | Similarity-derived | FAIL → HOLD | ✅ |
+| 16 | EIC provided | Verbatim | No | Normalized similarity vs. approved phrase | No | Yes | Similarity-derived | Coaching only | ✅ |
+| 17 | Cooling-off rights | Verbatim | **Yes** | Normalized similarity vs. approved phrase | No | Yes | Similarity-derived | FAIL → HOLD | ✅ |
+| 18 | Rapport | Behaviour | No | 3 signals: customer talk-time share, customer turn-count share, acknowledgment-phrase rate; confidence lowered when sample is thin (<2 customer turns) | **Optional** (`AI_PROVIDER` configured only; no-op by default) | Deterministic: aggregate, no single span. AI (if enabled): verified span(s) or discarded | Signal-count-derived; AI averages in when it agrees, never inflates alone | Low-confidence non-critical → QA_REVIEW only, never HOLD | ✅ |
+| 19 | Interruptions | Behaviour | No | Primary: verified timestamp overlap between consecutive different-speaker segments (exact duration reported). Secondary/weaker: `[crosstalk]` text marker with no verifiable timing | **Optional** (as above) | Yes — overlapping segment pair or marker segment | High (0.92) on timing-verified overlap; lower (0.7) on marker-only | Low-confidence non-critical → QA_REVIEW only, never HOLD | ✅ |
+| 20 | Objection handling | Behaviour | No | Categorized customer objection language (price / not_interested / already_satisfied / time / hesitation = strong; bare hedge words = weak) + agent-follow-up detection | **Optional** (as above) | Yes — the objection turn (+ verified AI evidence if enabled) | High (0.90) on a strong category match; low (0.65) on a weak/ambiguous one, regardless of PASS/FAIL | Low-confidence non-critical → QA_REVIEW only, never HOLD | ✅ |
 
 ## Summary
 
 ```
 20 checks
 ├── 20 executable (0 unconditional-PASS pass-throughs)
-├── 12 critical, all genuinely enforced (can FAIL or REVIEW from real
-│      transcript + CRM comparison — verified in tests/test_scenarios_e2e.py
-│      and tests/test_api_leads.py)
-├── 8 non-critical, all genuinely computed (2 conditional-not-applicable,
-│      correctly PASS only when the CRM source of truth says nothing
-│      applies — not a fabricated default)
-├── 3 "Behaviour" checks (Rapport, Interruptions, Objection handling) are
-│      real deterministic heuristics — talk-time share, crosstalk-marker
-│      counting, objection-keyword-plus-response detection — not an LLM
-│      call and not a fabricated AI score. Honestly documented as
-│      limited: a short synthetic transcript can't represent everything a
-│      real sentiment/prosody classifier would use as evidence.
-└── The NOT_EVALUABLE path (REVIEW + confidence always below the
-       floor) is real and exercised live: Lead 3613778's "Account holder
-       confirmed" genuinely resolves to it, not a hardcoded case.
+├── 12 critical, all genuinely enforced — each can independently produce
+│      FAIL from real transcript+CRM comparison, verified in
+│      tests/test_scenarios_e2e.py and tests/test_api_leads.py
+├── 8 non-critical, all genuinely computed
+├── 3 checks (Rapport, Interruptions, Objection handling) are eligible
+│      for an OPTIONAL AI semantic refinement layer
+│      (app/services/ai_behaviour.py) — a no-op with AI_PROVIDER=none
+│      (the live demo's actual configuration), tested against a fake
+│      provider otherwise (tests/test_ai_behaviour.py, 11 cases)
+├── 0 checks let AI touch a critical result, a rule version, CRM data, or
+│      the gate decision — structurally impossible (ai_behaviour.py is
+│      only ever called from the 3 non-critical metrics above)
+└── The NOT_EVALUABLE path (REVIEW + confidence always below the floor)
+       is real and exercised live: Lead 3613778's "Account holder
+       confirmed" genuinely resolves to it, not a hardcoded case
 ```
 
-## Why the 3 heuristic Behaviour checks aren't "20/20 fully NLP-verified"
+## Gate scoping (current, authoritative)
 
-Per the brief's own architecture split (Verbatim = deterministic text
-comparison, Factual = structured extraction + authoritative-source
-comparison, Behaviour = semantic classifier), a real sentiment/rapport
-classifier is a materially different kind of system than the other 17
-checks — and per this hardening pass's own explicit instruction, it was
-NOT replaced with "14 fake LLM prompts" for reliability reasons (no
-network dependency, no API key required for the demo, deterministic and
-fast). What's shipped is a genuine, transcript-derived, non-fabricated
-signal for all three; the honest limitation is documented here and in each
-evaluator's docstring rather than hidden.
+`criticalFails > 0 → HOLD; ANY check's confidence < floor → QA_REVIEW;
+else AUTO_SUBMIT` (`backend/app/services/gate.py`). A low-confidence
+non-critical check (including all 3 Behaviour heuristics above) can only
+ever produce `QA_REVIEW`, never `HOLD` — the `critical_fails` count that
+drives `HOLD` only ever counts critical checks. See
+`docs/DECISIONS.md`'s Phase 4 section for why an earlier critical-only
+reading of the low-confidence rule was corrected back to this.
+
+## Deterministic vs. AI-eligible, one more time, plainly
+
+```
+Critical compliance (12 checks: disclaimer, account holder, address,
+DOB, fuel type, NMI, DMO, rates, life support, email, T&Cs, cooling-off)
+  -> 100% deterministic. No AI involvement of any kind, ever.
+  -> This is what the gate decision is actually made from.
+
+Non-critical Factual/Verbatim (Concession, Move-in date, Gift card,
+EIC) -> 100% deterministic. Not AI-eligible (no semantic ambiguity to
+interpret — they're value comparisons or verbatim matches like the
+critical ones, just not gate-blocking).
+
+Behaviour (Dead air, Rapport, Interruptions, Objection handling)
+  -> Deterministic heuristic always computed first.
+  -> Rapport / Interruptions / Objection handling ONLY may be refined by
+     an optional AI layer, additive, never authoritative on its own,
+     never able to override the deterministic status.
+  -> Dead air is never AI-eligible (a duration threshold has nothing
+     semantic to interpret).
+```

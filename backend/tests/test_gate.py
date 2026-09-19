@@ -50,13 +50,15 @@ def test_routes_to_qa_review_on_low_confidence_even_if_status_is_review_not_fail
     assert outcome.low_confidence == 1
 
 
-def test_low_confidence_non_critical_check_does_not_route_to_qa_review():
-    """Non-critical confidence never gates the decision — it's coaching
-    signal (brief §15 "never critical, never blocking"), not a reason to
-    escalate a call to a human who didn't need to see it."""
+def test_low_confidence_non_critical_check_still_routes_to_qa_review_but_never_hold():
+    """Scoped to ANY check per the CIMET spec's literal text ("low
+    confidence on any check — routed to QA rather than auto-passed") —
+    but a low-confidence non-critical check still can never produce a
+    HOLD on its own, only QA_REVIEW (a human look, not a block)."""
     outcome = evaluate_gate([check(critical=False, status="PASS", confidence=0.5)])
-    assert outcome.decision == "AUTO_SUBMIT"
-    assert outcome.low_confidence == 0
+    assert outcome.decision == "QA_REVIEW"
+    assert outcome.low_confidence == 1
+    assert outcome.critical_fails == 0
 
 
 def test_confidence_exactly_at_floor_is_not_low_boundary_is_exclusive():
@@ -104,12 +106,12 @@ def test_notes_an_overridden_hold():
 
 def test_describes_qa_review_singular():
     outcome = evaluate_gate([check(confidence=0.5)])
-    assert describe_decision(outcome) == "Insufficient confidence on a critical check. Never auto-passed."
+    assert describe_decision(outcome) == "Insufficient confidence on a check. Never auto-passed."
 
 
 def test_describes_qa_review_plural():
-    outcome = evaluate_gate([check(confidence=0.5), check(confidence=0.5, critical=True)])
-    assert describe_decision(outcome) == "Insufficient confidence on 2 critical checks. Never auto-passed."
+    outcome = evaluate_gate([check(confidence=0.5), check(confidence=0.5, critical=False)])
+    assert describe_decision(outcome) == "Insufficient confidence on 2 checks. Never auto-passed."
 
 
 def test_describes_a_clean_auto_submit():
@@ -126,3 +128,37 @@ def test_gate_rule_copy_has_text_for_every_decision():
     assert "submit without human touch" in gate_rule_copy("AUTO_SUBMIT")
     assert "hold, route to the TL queue" in gate_rule_copy("HOLD")
     assert "route to QA, never auto-pass" in gate_rule_copy("QA_REVIEW")
+
+
+# ---- explicit gate-integrity cases (named to match the hardening audit's
+# own case numbering, for direct traceability in the final report) ----
+
+
+def test_gate_integrity_case_1_critical_fail_high_confidence_holds():
+    outcome = evaluate_gate([check(critical=True, status="FAIL", confidence=0.98)])
+    assert outcome.decision == "HOLD"
+
+
+def test_gate_integrity_case_2_critical_pass_low_confidence_on_any_check_reviews():
+    # every critical check PASSes; one non-critical check is low-confidence
+    outcome = evaluate_gate([check(critical=True, status="PASS", confidence=0.99), check(critical=False, status="PASS", confidence=0.5)])
+    assert outcome.decision == "QA_REVIEW"
+    assert outcome.critical_fails == 0
+
+
+def test_gate_integrity_case_3_all_checks_sufficiently_pass_auto_submits():
+    outcome = evaluate_gate([check(critical=True, confidence=0.99), check(critical=False, confidence=0.9)])
+    assert outcome.decision == "AUTO_SUBMIT"
+
+
+def test_gate_integrity_case_4_behaviour_issue_only_does_not_block():
+    # a non-critical FAIL at adequate confidence — a coaching note, not an
+    # escalation of any kind (neither HOLD nor QA_REVIEW).
+    outcome = evaluate_gate([check(critical=True, confidence=0.99), check(critical=False, status="FAIL", confidence=0.9)])
+    assert outcome.decision == "AUTO_SUBMIT"
+    assert outcome.non_critical_fails == 1
+
+
+# Case 5 (AI provider failure on behaviour) lives in
+# tests/test_ai_behaviour.py, where the AI evaluator itself is exercised —
+# it belongs there, not in this pure-function gate test module.

@@ -27,20 +27,23 @@ export interface GateOutcome {
 }
 
 /**
- * The gate: criticalFails > 0 → HOLD; any CRITICAL check's confidence <
- * floor → QA_REVIEW; else AUTO_SUBMIT. Pure and deterministic — never an
- * LLM call. Non-critical confidence never gates the decision (a
- * behavioural heuristic being honestly uncertain is coaching signal, not
- * an escalation reason — see backend/app/services/gate.py's docstring,
- * the authoritative implementation this one mirrors). See CLAUDE.md
- * non-negotiable #6 and design_handoff/NEXTJS_BUILD_PLAN.md §6.4.
+ * The gate: criticalFails > 0 → HOLD; any check's confidence < floor →
+ * QA_REVIEW; else AUTO_SUBMIT. Pure and deterministic — never an LLM
+ * call. Scoped to ANY check per the CIMET spec's literal text ("low
+ * confidence on any check — routed to QA rather than auto-passed") —
+ * see backend/app/services/gate.py's docstring, the authoritative
+ * implementation this one mirrors, for why an earlier critical-only
+ * reading was corrected back. A low-confidence non-critical check still
+ * can never produce a HOLD, only QA_REVIEW — it's a human look, not a
+ * block. See CLAUDE.md non-negotiable #6 and
+ * design_handoff/NEXTJS_BUILD_PLAN.md §6.4.
  */
 export function evaluateGate(
   checks: readonly GateInput[],
   opts: { repeatOffence?: boolean; overridden?: boolean } = {},
 ): GateOutcome {
   const criticalFails = checks.filter((c) => c.critical && c.status === "FAIL").length;
-  const lowConfidence = checks.filter((c) => c.critical && c.confidence < CONFIDENCE_FLOOR).length;
+  const lowConfidence = checks.filter((c) => c.confidence < CONFIDENCE_FLOOR).length;
 
   const decision: Decision =
     criticalFails > 0 ? "HOLD" : lowConfidence > 0 ? "QA_REVIEW" : "AUTO_SUBMIT";
@@ -77,8 +80,8 @@ export function describeDecision(
 
   if (decision === "QA_REVIEW") {
     return lowConfidence === 1
-      ? "Insufficient confidence on a critical check. Never auto-passed."
-      : `Insufficient confidence on ${lowConfidence} critical checks. Never auto-passed.`;
+      ? "Insufficient confidence on a check. Never auto-passed."
+      : `Insufficient confidence on ${lowConfidence} checks. Never auto-passed.`;
   }
 
   const base =
@@ -94,7 +97,7 @@ export function describeDecision(
 
 const GATE_RULES: Record<Decision, string> = {
   AUTO_SUBMIT: "Gate rule: all criticals pass → submit without human touch.",
-  QA_REVIEW: "Gate rule: low confidence on any critical check → route to QA, never auto-pass.",
+  QA_REVIEW: "Gate rule: low confidence on any check → route to QA, never auto-pass.",
   HOLD: "Gate rule: any critical fail → hold, route to the TL queue.",
 };
 

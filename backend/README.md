@@ -29,8 +29,9 @@ The frontend (`../`) reads `BACKEND_URL` (default `http://localhost:8000`)
 ## Tests
 
 ```bash
-python -m pytest        # 101 tests: unit, API integration, the brief's 8
-                         # end-to-end scenarios, adversarial cases
+python -m pytest        # 124 tests: unit, API integration, the brief's 8
+                         # end-to-end scenarios, adversarial cases, the
+                         # AI behaviour layer (against a fake provider)
 ```
 
 ## Architecture
@@ -48,26 +49,40 @@ FastAPI routes (app/api/*)
 - **`app/services/gate.py`** — the SOLE AUTHORITATIVE deterministic gate
   (the frontend never independently decides a final business outcome; it
   only displays this outcome). Pure functions, no I/O, no model call:
-  `criticalFails > 0 → HOLD; any CRITICAL check's confidence < floor →
-  QA_REVIEW; else AUTO_SUBMIT`. Non-critical confidence never gates the
-  decision. Mirrors the frontend's `src/lib/gate.ts` (kept as a pure,
-  unit-tested reference, not on the live path).
+  `criticalFails > 0 → HOLD; ANY check's confidence < floor → QA_REVIEW;
+  else AUTO_SUBMIT`. A low-confidence non-critical check can still only
+  ever produce `QA_REVIEW`, never `HOLD`. Mirrors the frontend's
+  `src/lib/gate.ts` (kept as a pure, unit-tested reference, not on the
+  live path).
 - **`app/services/evaluators/`** — `verbatim.py` (normalized-text
   similarity, difflib), `factual.py` (regex extraction + tolerance
   comparison against a `crm_snapshot` source of truth; also `presence`
-  and `skip_if_absent` modes), `behaviour.py` (transcript-only
-  heuristics — dead air, crosstalk-based interruptions, talk-time-share
-  rapport, objection-keyword-plus-response — never critical). All three
-  return a structured `CheckOutcome` (status, confidence, observed,
-  expected, evidence, rationale) — never a bare pass/fail string, and
-  never an LLM call. **20/20 checks in the catalogue resolve to a real
-  evaluator strategy — zero unconditional-PASS pass-throughs.** See
-  `../docs/CHECK_AUDIT.md` for the full per-check table and
-  `../docs/DECISIONS.md` for what's genuinely NLP-verified vs. an
-  honestly-documented heuristic. A check that genuinely can't be
-  evaluated (misconfiguration, or an evaluator exception) becomes
-  `not_evaluable_outcome` — REVIEW status at a confidence that always
-  trips the gate floor — never a silent PASS.
+  and `skip_if_absent` modes), `behaviour.py` (dead air; real
+  timestamp-overlap interruption detection with a weaker marker-only
+  fallback; multi-signal rapport — talk-time share + turn-count share +
+  acknowledgment-phrase rate; categorized objection-language detection +
+  agent-follow-up check — never critical). All return a structured
+  `CheckOutcome` (status, confidence, observed, expected, evidence,
+  rationale) — never a bare pass/fail string, and never an LLM call by
+  default. **20/20 checks in the catalogue resolve to a real evaluator
+  strategy — zero unconditional-PASS pass-throughs.** See
+  `../docs/CHECK_AUDIT.md` for the full per-check table. A check that
+  genuinely can't be evaluated (misconfiguration, or an evaluator
+  exception) becomes `not_evaluable_outcome` — REVIEW status at a
+  confidence that always trips the gate floor — never a silent PASS.
+- **`app/services/ai_behaviour.py`** — an OPTIONAL semantic refinement
+  layer for exactly 3 non-critical checks (Rapport, Interruptions,
+  Objection handling — never Dead air, never anything critical).
+  `AI_PROVIDER=none` (the default the live demo runs on): a zero-cost
+  no-op, deterministic result returned unchanged. When configured: asks
+  for a schema-validated JSON result, verifies any cited evidence against
+  the real transcript before trusting it at all, either averages
+  confidence in on agreement or flags disagreement while keeping the
+  deterministic status (never overrides it), and falls back to the
+  deterministic result on any malformed output, schema violation, or
+  provider exception. Tested against a fake provider
+  (`tests/test_ai_behaviour.py`) since no real API key is configured for
+  this build.
 - **`app/services/pipeline.py`** — orchestrates the above per lead,
   persists `CheckResult`/`Evidence`/`GateDecision`, and writes the
   ingest + evaluation audit trail. Each check's evaluator call is wrapped
@@ -91,10 +106,10 @@ FastAPI routes (app/api/*)
   real aggregate query (brief §31/§33).
 - **`app/services/redaction.py`** — card numbers are redacted before a
   transcript segment is ever persisted (`app/services/transcript.py`).
-- **`app/services/ai_provider.py`** — an `LLMProvider` abstraction, not
-  used by any evaluator by default (`AI_PROVIDER=none`, zero external
-  calls, zero credentials needed). Wired for a future semantic-extraction
-  step; a provider failure or malformed output can never produce a PASS.
+- **`app/services/ai_provider.py`** — the `LLMProvider` abstraction
+  `ai_behaviour.py` calls into. Not used anywhere in the critical-check
+  path (`verbatim.py`/`factual.py` never import it). A provider failure
+  or malformed output can never produce a PASS.
 - **`app/services/ingestion.py`, `sandbox_adapter.py`** — the ingestion
   and CIMET-scoring-sandbox boundaries. `MockIngestionAdapter` is what
   every seeded lead runs through; `CIMETSandboxAdapter` and
@@ -115,11 +130,18 @@ verbatim match thresholds, dead-air threshold, AI provider, CORS origins.
   rule-set rows exist for navigation only. `resolve_rule_version` itself
   is retailer/date-correct (tested with multiple retailers and versions)
   for when more checklist exports arrive.
-- 3 of the 20 checks (Rapport, Interruptions, Objection handling) use
-  honestly-limited deterministic heuristics rather than a full
-  sentiment/prosody classifier — real, transcript-derived signal, not
-  fabricated, but not claimed to be more sophisticated than it is. See
-  `../docs/CHECK_AUDIT.md`.
+- 3 of the 20 checks (Rapport, Interruptions, Objection handling) run on
+  real, transcript-derived deterministic signal — talk-time/turn-count
+  ratios, verified timestamp overlap, categorized keyword matching — with
+  an *optional* AI layer (`ai_behaviour.py`) available to corroborate
+  further when `AI_PROVIDER` is configured. Neither is a full
+  sentiment/prosody classifier; both are honestly documented as limited
+  rather than overstated. See `../docs/CHECK_AUDIT.md`.
+- The AI layer has not been exercised against a real provider in this
+  build (no API key configured) — only against a fake provider in tests.
+  The plumbing (schema validation, evidence verification, every fallback
+  path) is real and tested; a real model's actual output quality is
+  unverified here.
 - No real CIMET dialler/sandbox/CRM-submission integration —
   `MockIngestionAdapter` and `MockSubmissionAdapter` only, both clearly
   labeled DEMO/MOCK. `CIMETSandboxAdapter` is a boundary stub pending real

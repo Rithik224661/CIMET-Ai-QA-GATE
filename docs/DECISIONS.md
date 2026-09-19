@@ -189,23 +189,18 @@ is sized for a live demo, not concurrent production traffic. Revisit
 See `docs/CHECK_AUDIT.md` for the full per-check table. Summary of what
 changed and why.
 
-## Low-confidence gate scoping — critical checks only
+## Low-confidence gate scoping — critical checks only (SUPERSEDED, see Phase 4)
 
-`evaluate_gate()`'s QA_REVIEW branch now only counts **critical** checks
-with confidence below the floor (`low_confidence = sum(c.critical and
-c.confidence < floor)`), not any check. Non-critical confidence never
-gates the decision. This resolves a real tension: once all 20 checks are
-genuinely evaluated, 3 of them (the Behaviour heuristics) are honestly
-lower-confidence by nature — if their uncertainty gated the decision the
-same way a critical check's does, essentially every call would route to
-QA_REVIEW regardless of whether anything critical was actually wrong,
-which is both wrong (brief §15: behaviour checks are "never critical,
-never blocking") and would have made the demo unusable. Implemented
-identically in both the backend (`app/services/gate.py`, authoritative)
-and the frontend's pure reference implementation (`src/lib/gate.ts`, kept
-in sync and unit-tested, not on the live decision path). Verified this
-doesn't change any of the 9 named scenarios' expected decisions (all still
-pass in `tests/test_scenarios_e2e.py`).
+~~`evaluate_gate()`'s QA_REVIEW branch now only counts critical checks
+with confidence below the floor, not any check.~~ This was corrected back
+in Phase 4: the CIMET spec's literal text is "low confidence on **any**
+check — routed to QA rather than auto-passed", with no critical-only
+qualifier, and that reading is authoritative over the judgment call made
+here. See Phase 4's "Gate scoping reverted to ANY check" entry below for
+the current, correct behavior and how the demo stayed stable despite the
+change (by making sure the Behaviour heuristics' clean-case confidence
+sits safely above the floor, rather than by narrowing what the gate
+counts).
 
 ## NOT_EVALUABLE is REVIEW + confidence always below the floor, not a new status
 
@@ -291,3 +286,116 @@ hand. `crm_snapshot["date_of_birth"]` is stored pre-normalized
 — the DOB evaluator does light case/whitespace normalization, not full
 date-format parsing (a real system would want the latter; out of scope for
 this pass).
+
+---
+
+# Phase 4 decisions (behaviour intelligence, AI augmentation, gate correction)
+
+## Gate scoping reverted to ANY check, per the spec's literal text
+
+Phase 3 scoped `QA_REVIEW`'s low-confidence trigger to critical checks
+only, reasoning that once all 20 checks were genuinely evaluated, the 3
+heuristic Behaviour checks would otherwise flood every call into review.
+That reasoning was overridden: the CIMET spec's own words are "low
+confidence on any check — routed to QA rather than auto-passed", with no
+critical-only qualifier, and that's authoritative. `evaluate_gate()` (and
+`src/lib/gate.ts`, its pure reference) now scores **any** check's
+confidence against the floor again. The demo stayed stable through this
+change for a different reason than the one Phase 3 relied on: every
+Behaviour evaluator's "nothing wrong" confidence was tuned to sit safely
+above 0.85 (Dead air 0.94, Rapport 0.90, Interruptions 0.92, Objection
+handling 0.90), so a clean call's non-critical checks don't trip the
+floor — but a genuinely ambiguous one (a weak objection-language match, a
+marker-only interruption signal with no verifiable timing, a rapport
+read from a single customer turn) correctly reports confidence *below*
+the floor and routes the whole call to a human, exactly matching this
+build's stated demo story: "when the evidence isn't strong enough, the
+system does not pretend to know — it routes the case to QA." A
+low-confidence non-critical check still can never produce a `HOLD` on its
+own — only `QA_REVIEW` — that part was never in question.
+
+## Behaviour heuristics gained real corroborating signals, not just a pass/fail line
+
+Per audit, the Phase 3 Behaviour heuristics were genuine but single-signal
+(one ratio, one marker count, one keyword match). Phase 4 adds real
+corroborating signals and lets confidence reflect how much of them was
+actually available:
+
+- **Interruptions** now primarily detects **verified timestamp overlap**
+  between consecutive different-speaker segments (`a.end_seconds >
+  b.start_seconds`, reported as an exact overlap duration) — the `
+  [crosstalk]` text marker is now the *secondary*, weaker signal, used
+  only when no timing-verified overlap exists, and reported at
+  materially lower confidence (0.7 vs 0.92) since it can't be
+  independently verified. Lead `3613811`'s crosstalk turns were given
+  real overlapping start/end timestamps (588.0–595.0s agent,
+  593.0–598.0s customer → a genuine, computed 2.0s overlap) so this
+  primary signal is actually exercised, not just the fallback.
+- **Rapport** now combines three signals — customer talk-time share,
+  customer turn-*count* share, and an acknowledgment-phrase rate — and
+  lowers confidence honestly when the sample is thin (fewer than 2
+  customer turns), rather than reporting the same confidence regardless
+  of how much data backed the number.
+- **Objection handling** now categorizes the objection (`price`,
+  `not_interested`, `already_satisfied`, `time`, `hesitation` — all
+  "strong", unambiguous phrase matches — vs. `uncertainty`, a "weak"
+  bare hedge-word match like "actually"/"um"). A weak match reports low
+  confidence *regardless of PASS/FAIL* — brief §28's "customer mentions
+  it jokingly" case: the system can't tell sarcasm from a real objection
+  from text alone, so it says so, rather than confidently asserting
+  either outcome. Lead `3613824` was given a real price-objection +
+  agent-response exchange so this evaluator has a positive example to
+  demonstrate, not just the default "nothing to handle" PASS on every
+  lead.
+
+## Optional AI semantic layer for Behaviour checks — `app/services/ai_behaviour.py`
+
+A new module, invoked only for the 3 AI-eligible Behaviour metrics
+(`rapport`, `interruptions`, `objection_handling` — never `dead_air`,
+which is a hard duration threshold with nothing semantic to interpret),
+and only when `AI_PROVIDER` is configured to something other than
+`"none"`. With the default (`AI_PROVIDER=none`, what the live demo
+actually runs on), `maybe_refine_with_ai()` is a zero-cost no-op — it
+returns the deterministic outcome completely unchanged, no network call,
+no latency added. This was a deliberate reliability choice, unchanged
+from Phase 3's reasoning: the demo must not depend on external credentials
+or network availability.
+
+When configured, the AI layer:
+
+- Is asked for a structured JSON result (`status`, `confidence`,
+  `signals[]`, `evidence[]`, `rationale`) via the existing `LLMProvider`
+  abstraction — never free-form text accepted directly.
+- Has its `evidence` verified against the real transcript segments it was
+  given (`segmentId` + `quote` must actually match) before being trusted
+  at all; if it cites anything unverifiable, the entire response is
+  discarded and the deterministic outcome is used instead — the model may
+  never invent a transcript quotation.
+- Can never override the deterministic evaluator's PASS/FAIL status — see
+  `_combine()`: agreement averages confidence between the two; a
+  disagreement lowers confidence (genuine ambiguity) but keeps the
+  deterministic status. This is enforced by this module's own logic, not
+  merely by convention.
+- Falls back to the deterministic outcome on literally anything else that
+  can go wrong — malformed JSON, a schema-invalid response (wrong status
+  enum, out-of-range confidence), a provider exception, a timeout, or the
+  provider simply returning nothing — never a crash, never a silent PASS.
+  All of this is tested against a fake provider implementing the same
+  interface (`tests/test_ai_behaviour.py`), since no real API key is
+  configured for this build.
+- Cannot touch critical checks, rule versions, CRM fields, retailer plan
+  data, or the gate decision — structurally impossible, since this module
+  is only ever called from the 3 non-critical Behaviour metrics, and nothing
+  in `verbatim.py`, `factual.py`, or `gate.py` imports it.
+
+## Frontend/backend contract — no independent frontend gate, reaffirmed
+
+No change was needed here: `src/lib/data/leads.ts`'s `gateForLead()`
+already only reads the backend's persisted `decision` field (see Phase 2's
+"wire frontend to the live backend API" work) — it does not call
+`evaluateGate()` on the live data path. `src/lib/gate.ts` continues to
+exist solely as a pure, unit-tested reference implementation kept in sync
+with the backend's actual rule, for exactly the reason this pass's gate
+scoping correction proved valuable: having *two* independently-testable
+implementations of the same rule caught the critical-only/any-check
+question exercising real, distinguishable test cases on both sides.

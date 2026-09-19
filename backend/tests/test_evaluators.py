@@ -254,3 +254,79 @@ def test_objection_handling_fails_when_the_objection_is_never_addressed():
     segments = [seg(1, "CUSTOMER", 10, "Actually I don't want to proceed with this.")]
     outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx(segments))
     assert outcome.status == "FAIL"
+
+
+def test_objection_handling_categorizes_the_objection_type():
+    segments = [
+        seg(1, "CUSTOMER", 10, "I'm not interested, thanks."),
+        seg(2, "AGENT", 16, "No problem — thanks for your time."),
+    ]
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx(segments))
+    assert "not_interested" in outcome.observed
+
+
+def test_objection_handling_weak_signal_reports_low_confidence_not_a_confident_verdict():
+    """Brief §28's adversarial case: a customer mentioning something
+    offhand ('not interested', said jokingly, or a bare hedge word like
+    'actually') is genuinely ambiguous from text alone — the system must
+    report its uncertainty rather than confidently fail or pass."""
+    segments = [seg(1, "CUSTOMER", 10, "Actually, hmm, let me think about the colour options too.")]
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx(segments))
+    assert outcome.confidence < 0.85, "an ambiguous hedge-word-only match must not be reported at full confidence"
+
+
+def test_objection_handling_counts_a_long_delayed_agent_response_as_addressed():
+    """Documented limitation: this evaluator checks WHETHER the agent
+    responded at all, not HOW promptly — a real system might also score
+    response latency, out of scope here."""
+    segments = [
+        seg(1, "CUSTOMER", 10, "I'm not interested, this seems like a waste of money."),
+        seg(2, "AGENT", 400, "Sorry for the pause — let me address that concern now."),
+    ]
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx(segments))
+    assert outcome.status == "PASS"
+
+
+def test_objection_handling_with_no_transcript_segments_is_a_clean_pass_nothing_to_handle():
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx([]))
+    assert outcome.status == "PASS"
+
+
+# ---- behaviour: real timestamp-overlap interruption detection ----
+
+
+def test_interruptions_detects_a_genuine_timestamp_overlap_with_exact_duration():
+    segments = [
+        seg(1, "AGENT", 124.2, "So as I was explaining about the plan details", end=126.0),
+        seg(2, "CUSTOMER", 125.1, "Sorry, can I just ask something quickly?", end=127.0),
+    ]
+    outcome = evaluate_behaviour({"metric": "interruptions", "threshold_count": 1}, ctx(segments))
+    assert outcome.status == "FAIL"
+    assert "0.9s overlap" in outcome.observed
+    assert outcome.confidence >= 0.85, "a timing-verified overlap is the strongest signal this evaluator has"
+
+
+def test_interruptions_marker_only_signal_is_reported_at_lower_confidence_than_a_timed_overlap():
+    timed = evaluate_behaviour(
+        {"metric": "interruptions", "threshold_count": 1},
+        ctx([seg(1, "AGENT", 100, "talking", end=106), seg(2, "CUSTOMER", 103, "interrupting", end=108)]),
+    )
+    marker_only = evaluate_behaviour(
+        {"metric": "interruptions", "threshold_count": 1},
+        ctx([seg(1, "AGENT", 100, "talking over [crosstalk] here", end=106), seg(2, "CUSTOMER", 200, "later reply", end=206)]),
+    )
+    assert marker_only.confidence < timed.confidence
+
+
+def test_interruptions_with_a_single_segment_cannot_overlap_with_anything():
+    outcome = evaluate_behaviour({"metric": "interruptions"}, ctx([seg(1, "AGENT", 10, "Hello.")]))
+    assert outcome.status == "PASS"
+
+
+# ---- behaviour: missing/empty transcript ----
+
+
+def test_rapport_with_no_segments_at_all_is_not_evaluable():
+    outcome = evaluate_behaviour({"metric": "rapport"}, ctx([]))
+    assert outcome.status == "REVIEW"
+    assert outcome.confidence < 0.85
