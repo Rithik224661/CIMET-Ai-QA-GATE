@@ -1,0 +1,47 @@
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: #52a8ff;
+  text-decoration: none;
+}
+a:hover {
+  color: #8cc6ff;
+}
+
+::selection {
+  background: #52a8ff;
+  color: #000;
+}
+
+*:focus-visible {
+  outline: 2px solid #52a8ff;
+  outline-offset: 2px;
+}
+
+/* thin scrollbars on scroll-lock panels (drawer, transcript, sticky lists) */
+.qa-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.qa-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+.qa-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+select {
+  appearance: none;
+}
