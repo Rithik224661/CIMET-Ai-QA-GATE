@@ -8,7 +8,7 @@ check routes to QA rather than auto-passing. Every result resolves to a
 transcript line, an audio timestamp and the check-library version that
 was live on the call date.
 
-Built for CIMET's QA Automation engineering brief (`Docs/QA-Automation-Handout.pdf`).
+Built for CIMET's QA Automation engineering brief (`docs/QA-Automation-Handout.pdf`).
 
 This is **Phase 1** of the build: the full production UI, pixel-close to
 the approved design, running on typed fixtures — no backend yet. See
