@@ -15,9 +15,10 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python -m app.seed          # wipes and reseeds cimet.db — 9 named scenarios
+python -m app.seed 300      # wipes and reseeds cimet.db — 9 named scenarios
                              # + a 300-lead synthetic backfill for realistic
-                             # dashboard/calibration volume
+                             # dashboard/calibration volume (omit the count
+                             # for a smaller 250-lead default backfill)
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -29,9 +30,11 @@ The frontend (`../`) reads `BACKEND_URL` (default `http://localhost:8000`)
 ## Tests
 
 ```bash
-python -m pytest        # 124 tests: unit, API integration, the brief's 8
-                         # end-to-end scenarios, adversarial cases, the
-                         # AI behaviour layer (against a fake provider)
+python -m pytest        # 138 tests: unit, API integration, the brief's 8
+                         # end-to-end scenarios, adversarial cases, the AI
+                         # behaviour layer (fake provider + a genuine-but-
+                         # key-less Anthropic fallback test), and the real
+                         # audio endpoint
 ```
 
 ## Architecture
@@ -74,15 +77,21 @@ FastAPI routes (app/api/*)
   layer for exactly 3 non-critical checks (Rapport, Interruptions,
   Objection handling — never Dead air, never anything critical).
   `AI_PROVIDER=none` (the default the live demo runs on): a zero-cost
-  no-op, deterministic result returned unchanged. When configured: asks
-  for a schema-validated JSON result, verifies any cited evidence against
-  the real transcript before trusting it at all, either averages
-  confidence in on agreement or flags disagreement while keeping the
-  deterministic status (never overrides it), and falls back to the
-  deterministic result on any malformed output, schema violation, or
-  provider exception. Tested against a fake provider
-  (`tests/test_ai_behaviour.py`) since no real API key is configured for
-  this build.
+  no-op, deterministic result returned unchanged. When configured:
+  `pipeline.py` makes exactly **one** contextual call per lead
+  (`evaluate_all_behaviour_metrics`) covering all 3 eligible metrics
+  together — not one call per check — asks for a schema-validated JSON
+  result, verifies any cited evidence against the real transcript before
+  trusting it at all, either averages confidence in on agreement or flags
+  disagreement while keeping the deterministic status (never overrides
+  it), and falls back to the deterministic result on any malformed
+  output, schema violation, or provider exception. Every attempt (used or
+  fallen back) writes an `AI_EVALUATION` `AuditEvent` with
+  provider/model/used/latencyMs/fallbackReason — never the API key.
+  Tested against a fake provider (`tests/test_ai_behaviour.py`) and
+  against a genuine-but-unauthenticated Anthropic configuration
+  (`tests/test_ai_pipeline_integration.py`) — no real, credentialed
+  Anthropic call has been made in this environment.
 - **`app/services/pipeline.py`** — orchestrates the above per lead,
   persists `CheckResult`/`Evidence`/`GateDecision`, and writes the
   ingest + evaluation audit trail. Each check's evaluator call is wrapped
@@ -115,6 +124,19 @@ FastAPI routes (app/api/*)
   every seeded lead runs through; `CIMETSandboxAdapter` and
   `parse_sandbox_payload()` are anti-corruption-layer stubs that raise
   clearly rather than pretending a real integration exists.
+- **`app/services/asr_provider.py`** — the ASR (audio → transcript)
+  boundary. `MockTranscriptProvider` returns the transcript a lead was
+  already ingested with — it does not run any transcription, since
+  fabricating one would violate the "never fake a transcription result"
+  rule. `CIMETASRAdapter` is a boundary stub, same pattern as the
+  ingestion/sandbox adapters above.
+- **`app/services/audio_storage.py`, `app/api/audio.py`** — real,
+  playable WAV bytes served from `GET /api/leads/{id}/audio` with native
+  HTTP Range support (seekable from the browser). The audio itself is
+  **synthetic** — a speaker-distinguishable tone generated from the
+  lead's real seeded turn timings, not a real call recording — and is
+  only generated for the 9 named demo leads, never the bulk backfill. See
+  `../docs/INTEGRATION.md`.
 
 ## Configuration
 
@@ -137,11 +159,16 @@ verbatim match thresholds, dead-air threshold, AI provider, CORS origins.
   further when `AI_PROVIDER` is configured. Neither is a full
   sentiment/prosody classifier; both are honestly documented as limited
   rather than overstated. See `../docs/CHECK_AUDIT.md`.
-- The AI layer has not been exercised against a real provider in this
-  build (no API key configured) — only against a fake provider in tests.
-  The plumbing (schema validation, evidence verification, every fallback
-  path) is real and tested; a real model's actual output quality is
+- The AI layer's plumbing (schema validation, evidence verification, the
+  single-call-per-lead consolidation, every fallback path) is real and
+  tested — against a fake provider, and against a genuine
+  `AI_PROVIDER=anthropic` configuration with no valid key (verified live:
+  the gate decision is unaffected and the fallback is recorded honestly
+  in the audit trail). No real, credentialed Anthropic call has been made
+  in this environment — a real model's actual output quality is
   unverified here.
+- Audio is synthetic demo audio (a generated tone), not a real call
+  recording — see `../docs/INTEGRATION.md`.
 - No real CIMET dialler/sandbox/CRM-submission integration —
   `MockIngestionAdapter` and `MockSubmissionAdapter` only, both clearly
   labeled DEMO/MOCK. `CIMETSandboxAdapter` is a boundary stub pending real
