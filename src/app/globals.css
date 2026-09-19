@@ -12,12 +12,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-a {
-  color: #52a8ff;
-  text-decoration: none;
-}
-a:hover {
-  color: #8cc6ff;
+/* @layer base so Tailwind utility classes (layer: utilities) can override
+   this default link color — unlayered CSS always wins over layered CSS in
+   Tailwind v4 regardless of specificity, which was silently forcing every
+   button-styled <Link> (e.g. buttonClass("primary")) to render blue text
+   instead of its intended color. */
+@layer base {
+  a {
+    color: #52a8ff;
+    text-decoration: none;
+  }
+  a:hover {
+    color: #8cc6ff;
+  }
 }
 
 ::selection {

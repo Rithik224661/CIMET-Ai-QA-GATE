@@ -286,16 +286,6 @@ Stated plainly, as known prototype boundaries — not production claims:
 - The optional AI layer has been verified end-to-end against a fake provider and against a real-but-unauthenticated Anthropic configuration (safe fallback confirmed); it has not been exercised against a live, credentialed Anthropic call.
 - Calibration metrics are computed from synthetic bulk data, not real call volume.
 
-## Production path
-
-This is architecture vision only — none of the following is implemented:
-
-```
-CIMET dialler → real ingestion adapter → real ASR → evaluation → QA gate → CRM submission
-```
-
-Toward production, the natural next steps: scalable per-retailer rule configuration (beyond the one checklist export in hand), event-driven ingestion instead of a synchronous seed/evaluate loop, a swappable model/provider layer for the semantic evaluators, real observability (the current `AuditEvent` + `AI_EVALUATION` metadata is a starting point, not a metrics pipeline), a real calibration feedback loop against reviewer disagreement, a durable/versioned persistence model for check results, and role-based access control on the review and override actions.
-
 ## Hackathon / development context
 
 - Built for the **CIMET AI Hiring Hackathon 2026**, run through HackCulture.

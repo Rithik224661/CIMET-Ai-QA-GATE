@@ -103,7 +103,3 @@ See `docs/INTEGRATION.md` for the full IMPLEMENTED / READY FOR INTEGRATION / NOT
 - The `/api/leads/{id}/audio` endpoint derives its file path purely from the validated `lead_id`, never from a client-supplied path — no arbitrary file read is possible.
 - CORS origins are an explicit allowlist (`Settings.cors_origins`), not a wildcard.
 - API error responses carry a `detail` string only — no stack traces or filesystem paths are returned to the client (`HTTPException` usage throughout `app/api/*.py`).
-
-## Scalability path
-
-See "Production path" in the root README — this section is intentionally vision-only, since none of it is implemented in this prototype.
