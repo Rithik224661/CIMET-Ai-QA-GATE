@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#000; }
+  body { -webkit-font-smoothing:antialiased; }
+  a { color:#52a8ff; text-decoration:none; }
+  a:hover { color:#8cc6ff; }
+  ::selection { background:#52a8ff; color:#000; }
+  *:focus-visible { outline:2px solid #52a8ff; outline-offset:2px; }
+  .sl::-webkit-scrollbar { width:6px; height:6px; }
+  .sl::-webkit-scrollbar-thumb { background:rgba(255,255,255,.18); }
+  .sl::-webkit-scrollbar-track { background:transparent; }
+  select { appearance:none; }
+  @keyframes qaspin { to { transform:rotate(360deg); } }
+  @keyframes qapulse { 0%,100% { opacity:.35; } 50% { opacity:1; } }
+  @keyframes qaslide { from { transform:translateX(16px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+</style>
+</helmet>
+
+<div style="background:#000;color:#fff;font-family:Inter,sans-serif;min-height:100vh;display:flex;flex-direction:{{ shellDir }}">
+
+  <aside style="{{ navStyle }}">
+    <div style="display:flex;align-items:center;gap:10px;padding:0 8px 4px">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><rect x="0.5" y="0.5" width="17" height="17" stroke="#fff"></rect><rect x="5" y="5" width="8" height="8" fill="#52a8ff"></rect></svg>
+      <span style="font-size:15px;font-weight:500;letter-spacing:-0.3px">CIMET <span style="color:#999">QA Gate</span></span>
+    </div>
+    <nav style="{{ navListStyle }}" aria-label="Primary">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="6">
+        <button type="button" onClick="{{ n.go }}" aria-current="{{ n.current }}" style="{{ n.style }}" style-hover="background:#121212;color:#ffffff">
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;width:16px;flex:none">{{ n.num }}</span>
+          <span>{{ n.label }}</span>
+          <sc-if value="{{ n.badge }}" hint-placeholder-val="{{ false }}">
+            <span style="margin-left:auto;font-family:'Geist Mono',monospace;font-size:11px;color:#999;background:#1f1f1f;border-radius:100px;padding:1px 8px">{{ n.badge }}</span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </nav>
+    <div style="{{ navFootStyle }}">
+      <div style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;gap:6px">
+        <span style="width:6px;height:6px;border-radius:100px;background:#e0a341;display:block"></span>
+        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px">Demo data</span>
+      </div>
+      <p style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;line-height:1.5;margin:12px 0 0">Synthetic leads and sanitised transcripts. No customer PII.</p>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px clamp(16px,2.4vw,28px);border-bottom:1px solid rgba(255,255,255,.145);position:sticky;top:0;background:#000;z-index:20">
+      <div style="min-width:0">
+        <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px">{{ crumb }}</div>
+        <h1 style="font-size:18px;font-weight:500;letter-spacing:-0.5px;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ viewTitle }}</h1>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto">
+        <label style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px" for="qa-retailer">Retailer</label>
+        <select id="qa-retailer" value="{{ retailer }}" onChange="{{ setRetailer }}" style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;font-family:'Geist Mono',monospace;font-size:12px;padding:7px 10px">
+          <option value="All retailers">All retailers</option>
+          <option value="Retailer 1">Retailer 1</option>
+          <option value="Retailer 2">Retailer 2</option>
+          <option value="Retailer 3">Retailer 3</option>
+        </select>
+        <label style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px" for="qa-range">Range</label>
+        <select id="qa-range" value="{{ range }}" onChange="{{ setRange }}" style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;font-family:'Geist Mono',monospace;font-size:12px;padding:7px 10px">
+          <option value="Today">Today</option>
+          <option value="7 days">7 days</option>
+          <option value="30 days">30 days</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="sl" style="flex:1;min-height:0;overflow:auto;padding:clamp(16px,2.4vw,28px);padding-bottom:64px">
+
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="display:grid;grid-template-columns:{{ kpiCols }};border-top:1px solid rgba(255,255,255,.145);border-left:1px solid rgba(255,255,255,.145)">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <div style="border-right:1px solid rgba(255,255,255,.145);border-bottom:1px solid rgba(255,255,255,.145);padding:20px 20px 24px;background:#0a0a0a">
+                <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">{{ k.label }}</div>
+                <div style="display:flex;align-items:baseline;gap:6px;margin-top:14px">
+                  <span style="font-family:'Geist Mono',monospace;font-size:40px;line-height:1;letter-spacing:-2.2px;color:{{ k.color }}">{{ k.value }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:14px;color:#999">{{ k.unit }}</span>
+                </div>
+                <div style="font-size:12px;color:#999;margin-top:10px">{{ k.sub }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px">
+            <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Decision distribution</h2>
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">1,284 sales scored</span>
+              </div>
+              <div style="display:flex;gap:2px;height:10px;width:100%;margin:20px 0 16px">
+                <div style="width:79.4%;background:#62c073;height:100%" title="Auto-submit"></div>
+                <div style="width:13.1%;background:#f2685c;height:100%" title="Hold"></div>
+                <div style="width:7.5%;background:#e0a341;height:100%" title="QA review"></div>
+              </div>
+              <sc-for list="{{ distribution }}" as="d" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+                  <span style="{{ d.dot }}"></span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed">{{ d.label }}</span>
+                  <span style="margin-left:auto;font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ d.count }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;width:56px;text-align:right">{{ d.pct }}</span>
+                </div>
+              </sc-for>
+              <p style="font-size:12px;color:#999;line-height:1.5;margin:16px 0 0">Gate rule: all criticals pass → auto-submit. Any critical fail → TL queue. Low confidence on any check → QA, never auto-pass.</p>
+            </div>
+
+            <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Which check is failing</h2>
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">rolling 7 days</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:14px;margin-top:20px">
+                <sc-for list="{{ failingChecks }}" as="f" hint-placeholder-count="5">
+                  <div>
+                    <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:7px">
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999;flex:none">{{ f.count }} fails · {{ f.type }}</span>
+                    </div>
+                    <div style="width:100%;height:6px;background:rgba(255,255,255,.08);position:relative">
+                      <div style="{{ f.bar }}"></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px">
+            <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145)">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.145)">
+                <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Recent critical failures</h2>
+                <button type="button" onClick="{{ goQueue }}" style="background:transparent;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;font-family:'Geist Mono',monospace;font-size:11px;padding:5px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px" style-hover="border-color:rgba(255,255,255,.4)">Open queue</button>
+              </div>
+              <sc-for list="{{ recentFailures }}" as="r" hint-placeholder-count="4">
+                <button type="button" onClick="{{ r.open }}" style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(255,255,255,.08);padding:12px 20px;cursor:pointer" style-hover="background:#121212">
+                  <span style="font-family:'Geist Mono',monospace;font-size:13px;color:#ededed">{{ r.lead }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#f2685c">✕ {{ r.check }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">{{ r.meta }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-align:right">{{ r.age }}</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145)">
+              <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.145)">
+                <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Recent human overrides</h2>
+              </div>
+              <sc-for list="{{ recentOverrides }}" as="o" hint-placeholder-count="3">
+                <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.08)">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:'Geist Mono',monospace;font-size:13px;color:#ededed">{{ o.lead }}</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#f2685c">AI {{ o.ai }}</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#666">→</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#62c073">Human {{ o.human }}</span>
+                  </div>
+                  <div style="font-size:12px;color:#999;margin-top:6px;line-height:1.45">{{ o.reason }}</div>
+                  <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin-top:6px">{{ o.who }} · {{ o.time }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isQueue }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+            <sc-for list="{{ queueFilters }}" as="q" hint-placeholder-count="6">
+              <button type="button" onClick="{{ q.set }}" aria-pressed="{{ q.on }}" style="{{ q.style }}" style-hover="border-color:rgba(255,255,255,.4)">{{ q.label }} <span style="color:#666">{{ q.count }}</span></button>
+            </sc-for>
+          </div>
+          <div class="sl" style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);overflow-x:auto">
+            <div style="{{ queueHeadStyle }}">
+              <span>Lead</span><span>Retailer / agent</span><span>Reason</span><span>Confidence</span><span>Age</span><span style="text-align:right">Decision</span>
+            </div>
+            <sc-for list="{{ queueRows }}" as="row" hint-placeholder-count="7">
+              <button type="button" onClick="{{ row.open }}" style="{{ row.style }}" style-hover="background:#121212">
+                <span style="font-family:'Geist Mono',monospace;font-size:13px;color:#ededed;display:flex;align-items:center;gap:8px">{{ row.id }}<sc-if value="{{ row.repeat }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#f2685c;border:1px solid #f2685c;padding:0 4px">×3</span></sc-if></span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ row.who }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;overflow:hidden;text-overflow:ellipsis">{{ row.reason }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ row.confColor }}">{{ row.conf }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ row.age }}</span>
+                <span style="justify-self:end"><span style="{{ row.chip }}"><span style="{{ row.dot }}"></span>{{ row.decision }}</span></span>
+              </button>
+            </sc-for>
+          </div>
+          <p style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin:14px 0 0">Ordered by severity, then age. Sampled clean calls are 5% of auto-submits, drawn for calibration.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isSale }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:{{ saleCols }};gap:16px;align-items:start">
+
+          <div class="sl" style="{{ leadListStyle }}">
+            <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;padding:14px 14px 10px">Scenarios</div>
+            <sc-for list="{{ leadList }}" as="l" hint-placeholder-count="9">
+              <button type="button" onClick="{{ l.open }}" aria-current="{{ l.current }}" style="{{ l.style }}" style-hover="background:#121212">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="{{ l.dot }}"></span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:13px;color:#ededed">{{ l.id }}</span>
+                  <span style="margin-left:auto;font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase">{{ l.tag }}</span>
+                </div>
+                <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#999;margin-top:5px;padding-left:14px">{{ l.sub }}</div>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="min-width:0">
+
+            <sc-if value="{{ stateProcessing }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:32px">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span style="display:block;width:14px;height:14px;border:2px solid rgba(255,255,255,.18);border-top-color:#52a8ff;border-radius:100px;animation:qaspin 900ms linear infinite"></span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#52a8ff;text-transform:uppercase;letter-spacing:1px">Processing</span>
+                </div>
+                <h2 style="font-size:24px;font-weight:500;letter-spacing:-1px;margin:18px 0 6px">Scoring {{ leadId }}</h2>
+                <p style="font-size:13px;color:#999;margin:0 0 24px">Transcript received 34s ago. Checks are executing against Retailer 1 · v1.4.</p>
+                <div style="display:flex;flex-direction:column;gap:1px;background:rgba(255,255,255,.145);border-top:1px solid rgba(255,255,255,.145);border-bottom:1px solid rgba(255,255,255,.145)">
+                  <sc-for list="{{ pipeline }}" as="p" hint-placeholder-count="6">
+                    <div style="display:flex;align-items:center;gap:10px;background:#0a0a0a;padding:11px 0">
+                      <span style="{{ p.dot }}"></span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ p.color }}">{{ p.label }}</span>
+                      <span style="margin-left:auto;font-family:'Geist Mono',monospace;font-size:11px;color:#666">{{ p.state }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ stateError }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#0a0a0a;border:1px solid #f2685c;padding:32px">
+                <div style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;gap:6px">
+                  <span style="width:6px;height:6px;border-radius:100px;background:#f2685c;display:block"></span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#f2685c;text-transform:uppercase">Processing failed</span>
+                </div>
+                <h2 style="font-size:24px;font-weight:500;letter-spacing:-1px;margin:18px 0 6px">Transcript unavailable for {{ leadId }}</h2>
+                <p style="font-size:13px;color:#999;margin:0;max-width:520px;line-height:1.55">The dialler returned a 0-byte recording on the ingest callback. Nothing was scored, and the sale has not been submitted — it is held pending a usable artifact rather than passed by default.</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:24px">
+                  <button type="button" style="background:#fff;color:#121212;border:0;border-radius:0;padding:10px 14px;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#e7e7e7">Re-request recording</button>
+                  <button type="button" style="background:transparent;color:#ededed;border:1px solid rgba(255,255,255,.145);border-radius:0;padding:10px 14px;font-size:13px;cursor:pointer" style-hover="border-color:rgba(255,255,255,.4)">Route to manual QA</button>
+                </div>
+                <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin-top:20px">ingest_error · E_EMPTY_MEDIA · retry 2 of 3 · 09:41:06</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ stateScored }}" hint-placeholder-val="{{ true }}">
+              <div>
+                <div style="{{ decisionStyle }}">
+                  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:20px">
+                    <div style="min-width:240px;flex:1">
+                      <div style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;gap:6px">
+                        <span style="{{ decisionDot }}"></span>
+                        <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:.5px">Gate decision</span>
+                      </div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:clamp(34px,4.4vw,52px);line-height:1;letter-spacing:-2.6px;color:{{ decisionColor }};margin-top:16px">{{ decision }}</div>
+                      <div style="font-size:15px;color:#ededed;margin-top:16px;line-height:1.5;max-width:460px">{{ decisionReason }}</div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:12px;color:#999;margin-top:14px;line-height:1.55;max-width:460px">{{ decisionRule }}</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.145);border:1px solid rgba(255,255,255,.145);min-width:240px;max-width:420px;flex:1;align-self:flex-start">
+                      <sc-for list="{{ decisionStats }}" as="s" hint-placeholder-count="4">
+                        <div style="background:#0a0a0a;padding:12px 14px">
+                          <div style="font-family:'Geist Mono',monospace;font-size:22px;color:{{ s.color }};letter-spacing:-1px">{{ s.value }}</div>
+                          <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-top:6px">{{ s.label }}</div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.145)">
+                    <sc-for list="{{ leadMeta }}" as="m" hint-placeholder-count="6">
+                      <div style="display:flex;gap:8px">
+                        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px">{{ m.k }}</span>
+                        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#ededed">{{ m.v }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <sc-if value="{{ hasOverride }}" hint-placeholder-val="{{ false }}">
+                  <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);border-left:2px solid #52a8ff;padding:18px 20px;margin-top:16px">
+                    <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#52a8ff;text-transform:uppercase;letter-spacing:1px">Human override recorded</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:24px;margin-top:14px">
+                      <div>
+                        <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">AI decision</div>
+                        <div style="font-family:'Geist Mono',monospace;font-size:16px;color:#f2685c;margin-top:5px">{{ overrideAi }}</div>
+                      </div>
+                      <div>
+                        <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Human decision</div>
+                        <div style="font-family:'Geist Mono',monospace;font-size:16px;color:#62c073;margin-top:5px">{{ overrideHuman }}</div>
+                      </div>
+                      <div style="min-width:200px;flex:1">
+                        <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Reason</div>
+                        <div style="font-size:13px;color:#ededed;margin-top:5px;line-height:1.45">{{ overrideReasonText }}</div>
+                      </div>
+                    </div>
+                    <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin-top:14px">{{ overrideWho }} · {{ overrideTime }} · both decisions retained in the ledger</div>
+                  </div>
+                </sc-if>
+
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 0 12px">
+                  <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Critical findings</h2>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">evidence-backed · click to inspect</span>
+                </div>
+
+                <sc-if value="{{ noFindings }}" hint-placeholder-val="{{ false }}">
+                  <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:32px;text-align:center">
+                    <div style="font-family:'Geist Mono',monospace;font-size:28px;color:#62c073">✓</div>
+                    <div style="font-size:15px;color:#ededed;margin-top:12px">No critical findings</div>
+                    <p style="font-size:13px;color:#999;margin:8px auto 0;max-width:420px;line-height:1.5">{{ emptyNote }}</p>
+                  </div>
+                </sc-if>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+                  <sc-for list="{{ findings }}" as="f" hint-placeholder-count="2">
+                    <div style="{{ f.cardStyle }}">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:{{ f.accent }};text-transform:uppercase;letter-spacing:1px">{{ f.banner }}</span>
+                        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">{{ f.ts }}</span>
+                      </div>
+                      <h3 style="font-size:19px;font-weight:500;letter-spacing:-0.5px;margin:12px 0 4px">{{ f.name }}</h3>
+                      <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px">{{ f.type }} · {{ f.crit }}</div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.145);border:1px solid rgba(255,255,255,.145);margin-top:16px">
+                        <div style="background:#000;padding:12px 14px">
+                          <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Observed (transcript)</div>
+                          <div style="font-family:'Geist Mono',monospace;font-size:14px;color:#f2685c;margin-top:8px;word-break:break-word">{{ f.observed }}</div>
+                        </div>
+                        <div style="background:#000;padding:12px 14px">
+                          <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Expected ({{ f.sourceShort }})</div>
+                          <div style="font-family:'Geist Mono',monospace;font-size:14px;color:#62c073;margin-top:8px;word-break:break-word">{{ f.expected }}</div>
+                        </div>
+                      </div>
+                      <div style="border-left:2px solid rgba(255,255,255,.18);padding:2px 0 2px 12px;margin-top:16px">
+                        <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Evidence</div>
+                        <p style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;line-height:1.6;margin:8px 0 0">{{ f.evidence }}</p>
+                      </div>
+                      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px">
+                        <span style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;gap:6px"><span style="{{ f.confDot }}"></span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">CONF {{ f.conf }}</span></span>
+                        <span style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ f.rule }}</span></span>
+                      </div>
+                      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">
+                        <button type="button" onClick="{{ f.play }}" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#121212;border:0;border-radius:0;padding:9px 13px;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#e7e7e7">▶ Play evidence · {{ f.ts }}</button>
+                        <button type="button" onClick="{{ f.inspect }}" style="background:transparent;color:#ededed;border:1px solid rgba(255,255,255,.145);border-radius:0;padding:9px 13px;font-size:13px;cursor:pointer" style-hover="border-color:rgba(255,255,255,.4)">Inspect evidence</button>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 0 12px">
+                  <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Call timeline</h2>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">{{ durLabel }} · speaker-separated · word-level timestamps</span>
+                </div>
+                <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+                  <div style="position:relative;height:34px;margin-bottom:6px">
+                    <div style="position:absolute;top:14px;left:0;right:0;height:6px;background:rgba(255,255,255,.08)"></div>
+                    <sc-for list="{{ deadAir }}" as="d" hint-placeholder-count="1">
+                      <div style="{{ d.style }}" title="dead air"></div>
+                    </sc-for>
+                    <sc-for list="{{ markers }}" as="mk" hint-placeholder-count="6">
+                      <button type="button" onClick="{{ mk.select }}" aria-label="{{ mk.aria }}" style="{{ mk.style }}" title="{{ mk.aria }}"></button>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:10px;color:#666">
+                    <span>00:00</span><span>{{ durLabel }}</span>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-family:'Geist Mono',monospace;font-size:11px;color:#999">
+                    <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;background:#62c073;display:block"></span>pass marker</span>
+                    <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;background:#f2685c;display:block"></span>critical fail</span>
+                    <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;background:#e0a341;display:block"></span>low confidence</span>
+                    <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:14px;height:6px;background:rgba(255,255,255,.22);display:block"></span>dead air</span>
+                  </div>
+                  <div class="sl" style="max-height:300px;overflow:auto;margin-top:18px;border-top:1px solid rgba(255,255,255,.145)">
+                    <sc-for list="{{ segments }}" as="s" hint-placeholder-count="6">
+                      <button type="button" onClick="{{ s.select }}" style="{{ s.style }}" style-hover="background:#121212">
+                        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;width:48px;flex:none">{{ s.ts }}</span>
+                        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:{{ s.speakerColor }};width:72px;flex:none;text-transform:uppercase">{{ s.speaker }}</span>
+                        <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ s.textColor }};line-height:1.6">{{ s.text }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 0 12px">
+                  <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Full checklist</h2>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+                      <button type="button" onClick="{{ t.set }}" aria-pressed="{{ t.on }}" style="{{ t.style }}" style-hover="border-color:rgba(255,255,255,.4)">{{ t.label }} <span style="color:#666">{{ t.count }}</span></button>
+                    </sc-for>
+                  </div>
+                </div>
+                <div class="sl" style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);overflow-x:auto">
+                  <div style="{{ checkHeadStyle }}">
+                    <span>Status</span><span>Check</span><span>Type</span><span>Criticality</span><span>Confidence</span><span>Time</span><span style="text-align:right">Evidence</span>
+                  </div>
+                  <sc-for list="{{ checkRows }}" as="c" hint-placeholder-count="12">
+                    <button type="button" onClick="{{ c.inspect }}" style="{{ c.style }}" style-hover="background:#121212">
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ c.color }};display:flex;align-items:center;gap:6px">{{ c.glyph }} {{ c.status }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ c.type }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ c.critColor }}">{{ c.crit }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ c.confColor }}">{{ c.conf }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ c.ts }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#52a8ff;text-align:right">{{ c.ev }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:28px">
+                  <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+                    <h2 style="font-size:15px;font-weight:500;margin:0 0 4px;letter-spacing:-0.3px">Human review</h2>
+                    <p style="font-size:13px;color:#999;margin:0 0 18px;line-height:1.5">The AI decision is never replaced. Your decision is recorded alongside it.</p>
+                    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.145);background:#000">
+                      <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">AI decision</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:14px;color:{{ decisionColor }};margin-left:auto">{{ decision }}</span>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:12px">
+                      <sc-for list="{{ overrideOptions }}" as="o" hint-placeholder-count="2">
+                        <button type="button" onClick="{{ o.set }}" aria-pressed="{{ o.on }}" style="{{ o.style }}">{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                    <label style="display:block;font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px" for="qa-reason">Override reason (required)</label>
+                    <textarea id="qa-reason" value="{{ reasonDraft }}" onChange="{{ setReason }}" rows="3" placeholder="e.g. Customer corrected the rate at 27:40; agent re-confirmed." style="width:100%;box-sizing:border-box;background:#000;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;font-family:'Geist Mono',monospace;font-size:12px;padding:10px;resize:vertical"></textarea>
+                    <button type="button" onClick="{{ confirmOverride }}" disabled="{{ confirmDisabled }}" style="{{ confirmStyle }}">Confirm decision</button>
+                    <sc-if value="{{ overrideSaved }}" hint-placeholder-val="{{ false }}">
+                      <div style="border:1px solid #52a8ff;background:#000;padding:12px 14px;margin-top:14px;animation:qaslide 180ms ease-out">
+                        <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#52a8ff;text-transform:uppercase;letter-spacing:.5px">Audit event written</div>
+                        <div style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;line-height:1.7;margin-top:8px">AI: {{ decision }}<br>Human: {{ savedChoice }}<br>Reviewer: QA Analyst · S. Bhandari<br>Reason: {{ savedReason }}<br>Time: 14:37:02</div>
+                      </div>
+                    </sc-if>
+                  </div>
+
+                  <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                      <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">Decision lineage</h2>
+                      <button type="button" onClick="{{ goAudit }}" style="background:transparent;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;font-family:'Geist Mono',monospace;font-size:11px;padding:5px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px" style-hover="border-color:rgba(255,255,255,.4)">Full ledger</button>
+                    </div>
+                    <div style="margin-top:18px">
+                      <sc-for list="{{ lineage }}" as="e" hint-placeholder-count="8">
+                        <div style="display:grid;grid-template-columns:56px 10px 1fr;gap:12px;align-items:start">
+                          <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;padding-top:2px">{{ e.time }}</span>
+                          <span style="{{ e.rail }}"></span>
+                          <span style="padding-bottom:14px">
+                            <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ e.color }};display:block">{{ e.label }}</span>
+                            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;display:block;margin-top:3px">{{ e.actor }}</span>
+                          </span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isRules }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:{{ rulesCols }};gap:16px;align-items:start">
+          <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145)">
+            <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;padding:14px 16px 8px">Retailer → checklist → version</div>
+            <sc-for list="{{ ruleSets }}" as="rs" hint-placeholder-count="4">
+              <button type="button" onClick="{{ rs.select }}" aria-current="{{ rs.current }}" style="{{ rs.style }}" style-hover="background:#121212">
+                <div style="font-family:'Geist Mono',monospace;font-size:13px;color:#ededed">{{ rs.retailer }}</div>
+                <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#999;margin-top:5px">{{ rs.checklist }}</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+                  <span style="{{ rs.chip }}">{{ rs.version }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#666">eff. {{ rs.effective }}</span>
+                </div>
+              </button>
+            </sc-for>
+            <p style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;line-height:1.55;padding:14px 16px;margin:0;border-top:1px solid rgba(255,255,255,.145)">Every score resolves to the version live on the call date, not today's version.</p>
+          </div>
+          <div class="sl" style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);min-width:0;overflow-x:auto">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.145)">
+              <h2 style="font-size:15px;font-weight:500;margin:0;letter-spacing:-0.3px">{{ activeRuleSet }}</h2>
+              <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ activeRuleMeta }}</span>
+              <span style="margin-left:auto;font-family:'Geist Mono',monospace;font-size:11px;color:#666">{{ activeRuleCount }} checks · weights locked</span>
+            </div>
+            <div style="{{ ruleHeadStyle }}">
+              <span>Check</span><span>Type</span><span>Critical</span><span>Weight</span><span>Source of truth</span>
+            </div>
+            <sc-for list="{{ ruleRows }}" as="r" hint-placeholder-count="10">
+              <div style="{{ r.style }}">
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed">{{ r.name }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ r.type }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.critColor }}">{{ r.crit }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ r.weight }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999;overflow:hidden;text-overflow:ellipsis">{{ r.source }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isCalibration }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;gap:6px;margin-bottom:16px">
+            <span style="width:6px;height:6px;border-radius:100px;background:#e0a341;display:block"></span>
+            <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999;text-transform:uppercase">Synthetic calibration data</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border-top:1px solid rgba(255,255,255,.145);border-left:1px solid rgba(255,255,255,.145)">
+            <sc-for list="{{ calKpis }}" as="k" hint-placeholder-count="4">
+              <div style="border-right:1px solid rgba(255,255,255,.145);border-bottom:1px solid rgba(255,255,255,.145);padding:20px;background:#0a0a0a">
+                <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">{{ k.label }}</div>
+                <div style="display:flex;align-items:baseline;gap:6px;margin-top:14px">
+                  <span style="font-family:'Geist Mono',monospace;font-size:36px;line-height:1;letter-spacing:-2px;color:{{ k.color }}">{{ k.value }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:13px;color:#999">{{ k.unit }}</span>
+                </div>
+                <div style="font-size:12px;color:#999;margin-top:10px">{{ k.sub }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px">
+            <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+              <h2 style="font-size:15px;font-weight:500;margin:0 0 4px;letter-spacing:-0.3px">Confidence distribution</h2>
+              <p style="font-size:12px;color:#999;margin:0 0 20px">Checks below 0.85 never auto-pass — they route to QA.</p>
+              <div style="display:flex;align-items:flex-end;gap:6px;height:140px">
+                <sc-for list="{{ confBuckets }}" as="b" hint-placeholder-count="8">
+                  <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;height:100%">
+                    <div style="{{ b.bar }}" title="{{ b.n }} checks"></div>
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#666">{{ b.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);padding:20px">
+              <h2 style="font-size:15px;font-weight:500;margin:0 0 4px;letter-spacing:-0.3px">Where AI and auditors disagree</h2>
+              <p style="font-size:12px;color:#999;margin:0 0 20px">312 sampled calls · 41 disagreements</p>
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <sc-for list="{{ disagreements }}" as="d" hint-placeholder-count="4">
+                  <div>
+                    <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:7px">
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed">{{ d.name }}</span>
+                      <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ d.n }}</span>
+                    </div>
+                    <div style="width:100%;height:6px;background:rgba(255,255,255,.08);position:relative">
+                      <div style="{{ d.bar }}"></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <p style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;line-height:1.55;margin:20px 0 0">Critical false-pass is the metric that gates release: it must stay at zero before the gate runs unattended on live traffic.</p>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px">
+            <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">Decision ledger for</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:14px;color:#ededed">{{ leadId }}</span>
+            <button type="button" onClick="{{ goSale }}" style="background:transparent;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;font-family:'Geist Mono',monospace;font-size:11px;padding:5px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px" style-hover="border-color:rgba(255,255,255,.4)">Back to sale</button>
+          </div>
+          <div class="sl" style="background:#0a0a0a;border:1px solid rgba(255,255,255,.145);overflow-x:auto">
+            <div style="{{ auditHeadStyle }}">
+              <span>Timestamp</span><span>Event</span><span>Actor / system</span><span>Version</span><span>Resulting state</span>
+            </div>
+            <sc-for list="{{ ledger }}" as="e" hint-placeholder-count="11">
+              <div style="{{ e.style }}">
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ e.time }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed">{{ e.event }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ e.actor }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ e.version }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ e.color }}">{{ e.state }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <p style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin:14px 0 0">Ledger is append-only. Overrides add an event; they never rewrite the AI decision.</p>
+        </div>
+      </sc-if>
+
+    </div>
+  </main>
+
+  <sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-modal="true" aria-label="Evidence inspector" style="position:fixed;inset:0;z-index:80;display:flex;justify-content:flex-end">
+      <button type="button" aria-label="Close inspector" onClick="{{ closeDrawer }}" style="position:absolute;inset:0;background:rgba(0,0,0,.72);border:0;cursor:pointer"></button>
+      <div class="sl" style="position:relative;width:min(460px,100%);height:100%;overflow:auto;background:#0a0a0a;border-left:1px solid rgba(255,255,255,.145);padding:24px;animation:qaslide 180ms ease-out">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px">Evidence inspector</div>
+            <h2 style="font-size:22px;font-weight:500;letter-spacing:-0.8px;margin:8px 0 0">{{ dv.name }}</h2>
+          </div>
+          <button type="button" onClick="{{ closeDrawer }}" aria-label="Close" style="width:32px;height:32px;background:transparent;border:1px solid rgba(255,255,255,.145);border-radius:0;color:#ededed;cursor:pointer;line-height:1;flex:none">×</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+          <span style="{{ dv.statusChip }}"><span style="{{ dv.statusDot }}"></span>{{ dv.status }}</span>
+          <span style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;font-family:'Geist Mono',monospace;font-size:12px;color:#999">{{ dv.type }}</span>
+          <span style="display:inline-flex;align-items:center;background:#1f1f1f;border-radius:100px;padding:4px 10px;font-family:'Geist Mono',monospace;font-size:12px;color:{{ dv.critColor }}">{{ dv.crit }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr;gap:1px;background:rgba(255,255,255,.145);border:1px solid rgba(255,255,255,.145);margin-top:20px">
+          <div style="background:#000;padding:14px">
+            <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Observed — what the transcript contains</div>
+            <div style="font-family:'Geist Mono',monospace;font-size:14px;color:{{ dv.observedColor }};margin-top:8px">{{ dv.observed }}</div>
+          </div>
+          <div style="background:#000;padding:14px">
+            <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Expected — authoritative source</div>
+            <div style="font-family:'Geist Mono',monospace;font-size:14px;color:#62c073;margin-top:8px">{{ dv.expected }}</div>
+            <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin-top:8px">{{ dv.source }}</div>
+          </div>
+          <div style="background:#000;padding:14px">
+            <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Evaluation — what the system determined</div>
+            <div style="font-size:13px;color:#ededed;margin-top:8px;line-height:1.55">{{ dv.why }}</div>
+          </div>
+        </div>
+        <div style="margin-top:20px">
+          <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Transcript evidence · {{ dv.ts }}</div>
+          <div style="border-left:2px solid #52a8ff;padding:10px 0 10px 12px;margin-top:10px;background:#000">
+            <p style="font-family:'Geist Mono',monospace;font-size:12px;color:#ededed;line-height:1.7;margin:0">{{ dv.evidence }}</p>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px">
+          <div>
+            <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Confidence</div>
+            <div style="font-family:'Geist Mono',monospace;font-size:22px;color:{{ dv.confColor }};margin-top:8px">{{ dv.conf }}</div>
+            <div style="width:100%;height:6px;background:rgba(255,255,255,.08);margin-top:8px;position:relative"><div style="{{ dv.confBar }}"></div></div>
+          </div>
+          <div>
+            <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px">Rule version</div>
+            <div style="font-family:'Geist Mono',monospace;font-size:13px;color:#ededed;margin-top:10px">{{ dv.rule }}</div>
+            <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;margin-top:6px">live on call date</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:24px">
+          <button type="button" onClick="{{ dv.play }}" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#121212;border:0;border-radius:0;padding:11px 15px;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#e7e7e7">▶ Play audio · {{ dv.ts }}</button>
+          <button type="button" onClick="{{ closeDrawer }}" style="background:transparent;color:#ededed;border:1px solid rgba(255,255,255,.145);border-radius:0;padding:11px 15px;font-size:13px;cursor:pointer" style-hover="border-color:rgba(255,255,255,.4)">Mark reviewed</button>
+        </div>
+        <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;margin-top:16px;border:1px solid rgba(255,255,255,.145);padding:12px 14px">
+            <span style="width:6px;height:6px;border-radius:100px;background:#52a8ff;display:block;animation:qapulse 1s ease-in-out infinite"></span>
+            <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#999">Playing 20s from {{ dv.ts }} — card numbers redacted in this stream</span>
+          </div>
+        </sc-if>
+        <p style="font-family:'Geist Mono',monospace;font-size:11px;color:#666;line-height:1.55;margin:20px 0 0">The system reports what failed and where. It does not rewrite the sale, correct the agent, or contact the customer.</p>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#52a8ff&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#52a8ff&quot;,&quot;#7c9cff&quot;,&quot;#62c073&quot;,&quot;#e0a341&quot;]},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Compact&quot;,&quot;Comfortable&quot;],&quot;default&quot;:&quot;Compact&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;}}">
+class Component extends DCLogic {
+  state = {
+    view: 'sale', leadId: '3613790', tab: 'All', drawerKey: null, playing: false,
+    seg: null, queueFilter: 'All', retailer: 'All retailers', range: '7 days',
+    ruleSet: 0, choice: null, reason: '', saved: null, narrow: false,
+  };
+
+  C = { pass: '#62c073', fail: '#f2685c', review: '#e0a341', info: '#52a8ff', mute: '#999999', ink: '#ededed', dim: '#666666' };
+  RING = '1px solid rgba(255,255,255,.145)';
+
+  componentDidMount() {
+    this._r = () => this.setState({ narrow: window.innerWidth < 1040 });
+    this._r();
+    window.addEventListener('resize', this._r);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this._r); }
+
+  catalogue() {
+    return [
+      ['Recording disclaimer', 'Verbatim', true, '00:12', 0.99, 'RET1-VB-001', 'Approved script v1.4 §1'],
+      ['Account holder confirmed', 'Factual', true, '02:41', 0.99, 'RET1-FM-002', 'CRM · account_holder'],
+      ['Address match', 'Factual', true, '03:20', 0.98, 'RET1-FM-003', 'CRM · service_address'],
+      ['DOB match', 'Factual', true, '04:05', 0.97, 'RET1-FM-004', 'CRM · date_of_birth'],
+      ['Fuel type', 'Factual', true, '05:02', 0.99, 'RET1-FM-005', 'CRM · fuel_type'],
+      ['NMI / MIRN verified', 'Factual', true, '06:12', 0.93, 'RET1-FM-006', 'CRM · nmi'],
+      ['DMO read verbatim', 'Verbatim', true, '09:55', 0.97, 'RET1-VB-007', 'Approved script v1.4 §4'],
+      ['Rates and charges', 'Factual', true, '14:02', 0.98, 'RET1-FM-008', 'Retailer 1 rate card · plan EN-A2'],
+      ['Concession applied', 'Factual', false, '16:20', 0.91, 'RET1-FM-009', 'CRM · concession_flag'],
+      ['Life support declared', 'Factual', true, '17:05', 0.99, 'RET1-FM-010', 'CRM · life_support'],
+      ['Dead air', 'Behaviour', false, '18:30', 0.94, 'RET1-BH-011', 'Transcript only'],
+      ['Move-in date', 'Factual', false, '20:15', 0.95, 'RET1-FM-012', 'CRM · move_in_date'],
+      ['Email captured', 'Factual', true, '22:10', 0.96, 'RET1-FM-013', 'CRM · email'],
+      ['Gift card value', 'Factual', false, '24:00', 0.92, 'RET1-FM-014', 'Retailer 1 promo table'],
+      ['T&Cs read', 'Verbatim', true, '25:40', 0.96, 'RET1-VB-015', 'Approved script v1.4 §9'],
+      ['EIC provided', 'Verbatim', false, '26:30', 0.94, 'RET1-VB-016', 'Approved script v1.4 §10'],
+      ['Cooling-off rights', 'Verbatim', true, '26:58', 0.95, 'RET1-VB-017', 'Approved script v1.4 §11'],
+      ['Rapport', 'Behaviour', false, '—', 0.88, 'RET1-BH-018', 'Transcript only'],
+      ['Interruptions', 'Behaviour', false, '—', 0.90, 'RET1-BH-019', 'Transcript only'],
+      ['Objection handling', 'Behaviour', false, '—', 0.86, 'RET1-BH-020', 'Transcript only'],
+    ];
+  }
+
+  leads() {
+    return [
+      { id: '3613742', tag: 'Lead A', sub: 'Clean call · auto-submit', retailer: 'Retailer 1', product: 'Energy', agent: 'Agent A · R. Kaul', tl: 'TL · M. Sethi', date: '2026-09-18 09:12', dur: 1620, decision: 'AUTO-SUBMIT', reason: 'All 13 critical checks passed. No human touch required.', state: 'scored', patch: {} },
+      { id: '3613790', tag: 'Lead B', sub: 'Rate + email mismatch · hold', retailer: 'Retailer 1', product: 'Energy', agent: 'Agent A · R. Kaul', tl: 'TL · M. Sethi', date: '2026-09-18 14:02', dur: 1800, decision: 'HOLD', reason: '2 critical checks failed. Sale held and routed to the TL queue.', repeat: false, state: 'scored',
+        patch: {
+          'Rates and charges': { status: 'FAIL', conf: 0.98, observed: '28.6c / kWh peak', expected: '31.9c / kWh peak', evidence: '"…so your peak usage will be charged at twenty-eight point six cents per kilowatt hour, and off-peak sits lower than that."', why: 'The quoted peak rate was extracted from the agent turn at 14:02 and compared with the rate card for plan EN-A2 attached to this lead. Numeric mismatch of 3.3c; outside the 0c tolerance for rate checks.' },
+          'Email captured': { status: 'FAIL', conf: 0.96, observed: 'j.smith@gmial.com', expected: 'j.smith@gmail.com', evidence: '"Let me read that back — j dot smith at g-m-i-a-l dot com, is that right?"', why: 'Read-back string normalised and compared character-by-character with the CRM email field. Domain transposition detected. Flagged rather than corrected — the system does not edit CRM data.' },
+          'Dead air': { status: 'FAIL', conf: 0.94, observed: '47s continuous silence at 18:30', expected: '< 30s', evidence: '[silence 18:30 → 19:17]', why: 'Non-critical behaviour check. Logged as a coaching note; does not block submission on its own.' },
+        } },
+      { id: '3613803', tag: 'Lead C', sub: 'Address mismatch · hold', retailer: 'Retailer 2', product: 'Energy', agent: 'Agent C · P. Nair', tl: 'TL · M. Sethi', date: '2026-09-18 11:48', dur: 1440, decision: 'HOLD', reason: '1 critical check failed. Sale held and routed to the TL queue.', state: 'scored',
+        patch: { 'Address match': { status: 'FAIL', conf: 0.95, observed: 'Unit 4, 12 Barker Street', expected: 'Unit 7, 12 Barker Street', evidence: '"That\'s unit four, twelve Barker Street — correct?"', why: 'Address components parsed from the confirmation turn and compared with the CRM service address. Unit number mismatch; street and suburb agree.' } } },
+      { id: '3613811', tag: 'Lead D', sub: 'Low confidence · QA review', retailer: 'Retailer 1', product: 'Energy', agent: 'Agent B · D. Aurora', tl: 'TL · K. Rao', date: '2026-09-18 13:20', dur: 1680, decision: 'QA REVIEW', reason: 'Insufficient confidence on a critical check. Never auto-passed.', state: 'scored',
+        patch: { 'DMO read verbatim': { status: 'REVIEW', conf: 0.61, observed: 'Partially audible — crosstalk 09:48–10:06', expected: 'DMO paragraph read verbatim', evidence: '"…the Default Market Offer for your [crosstalk] compared to…"', why: 'Word-error rate in this window exceeded the verbatim threshold because the customer spoke over the agent. The system will not assert a pass or a fail on degraded audio; it routes to a human.' } } },
+      { id: '3613824', tag: 'Lead E', sub: 'Behaviour note only · auto-submit', retailer: 'Retailer 3', product: 'Broadband', agent: 'Agent D · S. Iyer', tl: 'TL · K. Rao', date: '2026-09-18 10:05', dur: 1260, decision: 'AUTO-SUBMIT', reason: 'All critical checks passed. 1 non-critical behaviour note raised for coaching.', state: 'scored',
+        patch: { 'Dead air': { status: 'FAIL', conf: 0.92, ts: '12:14', observed: '38s continuous silence at 12:14', expected: '< 30s', evidence: '[silence 12:14 → 12:52]', why: 'Behaviour checks never block a sale. Routed to the agent scorecard as a coaching note.' } } },
+      { id: '3613766', tag: 'Lead F', sub: 'Human override · audit trail', retailer: 'Retailer 1', product: 'Energy', agent: 'Agent A · R. Kaul', tl: 'TL · M. Sethi', date: '2026-09-17 16:44', dur: 1560, decision: 'HOLD', reason: '1 critical check failed. Overturned by a human reviewer.', state: 'scored',
+        override: { ai: 'HOLD', human: 'PASS', reason: 'Customer corrected the rate at 27:40 and the agent re-confirmed 31.9c. The failing line predates the correction.', who: 'QA Analyst · S. Bhandari', time: '2026-09-17 17:31' },
+        patch: { 'Rates and charges': { status: 'FAIL', conf: 0.88, observed: '30.9c / kWh peak', expected: '31.9c / kWh peak', evidence: '"peak is thirty point nine cents" … later "sorry, that\'s thirty-one point nine"', why: 'First quoted rate mismatched the rate card. A later correction exists in the transcript but the check evaluates the read-back turn, which is why a human reviewed it.' } } },
+      { id: '3613778', tag: 'Lead G', sub: 'Repeat critical failure ×3', retailer: 'Retailer 1', product: 'Energy', agent: 'Agent B · D. Aurora', tl: 'TL · K. Rao', date: '2026-09-18 15:10', dur: 1740, decision: 'HOLD', reason: '1 critical check failed. Third failure of this check in a rolling 7 days — TL flagged.', repeat: true, state: 'scored',
+        patch: { 'Recording disclaimer': { status: 'FAIL', conf: 0.97, observed: 'Disclaimer not detected in first 120s', expected: 'Verbatim disclaimer before any capture', evidence: '"Hi, am I speaking with the account holder? Great, let\'s look at your bill…"', why: 'Consent is verified, not assumed. No disclaimer utterance matched the approved script inside the required window, so the call is treated as non-compliant regardless of the recording existing.' } } },
+      { id: '3613830', tag: 'Lead H', sub: 'Scoring in progress', retailer: 'Retailer 2', product: 'Energy', agent: 'Agent C · P. Nair', tl: 'TL · M. Sethi', date: '2026-09-18 15:38', dur: 1500, decision: 'PROCESSING', reason: '', state: 'processing', patch: {} },
+      { id: '3613834', tag: 'Lead I', sub: 'Ingest error · partial data', retailer: 'Retailer 3', product: 'Broadband', agent: 'Agent D · S. Iyer', tl: 'TL · K. Rao', date: '2026-09-18 09:41', dur: 0, decision: 'ERROR', reason: '', state: 'error', patch: {} },
+    ];
+  }
+
+  lead() { return this.leads().find(l => l.id === this.state.leadId) || this.leads()[1]; }
+
+  checksFor(lead) {
+    return this.catalogue().map(([name, type, critical, ts, conf, rule, source]) => {
+      const p = lead.patch[name] || {};
+      return { name, type, critical, ts: p.ts || ts, conf: p.conf != null ? p.conf : conf, rule, source,
+        status: p.status || 'PASS', observed: p.observed, expected: p.expected, evidence: p.evidence, why: p.why };
+    });
+  }
+
+  statusColor(s) { return s === 'PASS' ? this.C.pass : s === 'FAIL' ? this.C.fail : this.C.review; }
+  confColor(c) { return c >= 0.9 ? this.C.ink : c >= 0.85 ? this.C.mute : this.C.review; }
+  chip(color) { return `display:inline-flex;align-items:center;gap:6px;background:#1f1f1f;border-radius:100px;padding:4px 10px;font-family:'Geist Mono',monospace;font-size:12px;color:${color};text-transform:uppercase;letter-spacing:.3px`; }
+  dot(color) { return `width:6px;height:6px;border-radius:100px;background:${color};display:block;flex:none`; }
+  ageOf(date) {
+    const now = new Date('2026-09-18T15:52:00');
+    const mins = Math.max(1, Math.round((now - new Date(date.replace(' ', 'T'))) / 60000));
+    if (mins < 60) return mins + 'm';
+    if (mins < 1440) return Math.round(mins / 60) + 'h';
+    return Math.round(mins / 1440) + 'd';
+  }
+  secs(ts) { const m = /^(\d+):(\d+)$/.exec(ts || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; }
+
+  decisionMeta(d) {
+    if (d === 'AUTO-SUBMIT') return { color: this.C.pass, rule: 'Gate rule: all criticals pass → submit without human touch.' };
+    if (d === 'QA REVIEW') return { color: this.C.review, rule: 'Gate rule: low confidence on any check → route to QA, never auto-pass.' };
+    return { color: this.C.fail, rule: 'Gate rule: any critical fail → hold, route to the TL queue.' };
+  }
+
+  renderVals() {
+    const S = this.state, C = this.C, RING = this.RING;
+    const accent = this.props.accent ?? C.info;
+    const pad = (this.props.density ?? 'Compact') === 'Compact' ? '11px' : '16px';
+    const lead = this.lead();
+    const checks = this.checksFor(lead);
+    const crit = checks.filter(c => c.critical);
+    const fails = checks.filter(c => c.status === 'FAIL');
+    const critFails = fails.filter(c => c.critical);
+    const reviews = checks.filter(c => c.status === 'REVIEW');
+    const dm = this.decisionMeta(lead.decision);
+    const go = v => () => this.setState({ view: v });
+
+    const queueCount = this.leads().filter(l => (S.retailer === 'All retailers' || l.retailer === S.retailer) && (l.state === 'scored' || l.state === 'error')).length;
+    const navItems = [
+      ['dashboard', 'Dashboard', '01', null], ['queue', 'QA Queue', '02', String(queueCount)], ['sale', 'Sales', '03', null],
+      ['calibration', 'Calibration', '04', null], ['rules', 'Rules', '05', null], ['audit', 'Audit', '06', null],
+    ].map(([id, label, num, badge]) => {
+      const on = S.view === id;
+      return { label, num, badge, current: on ? 'page' : undefined, go: go(id),
+        style: `display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:${on ? '#121212' : 'transparent'};border:0;border-left:2px solid ${on ? accent : 'transparent'};color:${on ? '#fff' : C.mute};font-family:Inter,sans-serif;font-size:13px;padding:10px 12px;cursor:pointer;white-space:nowrap` };
+    });
+
+    const titles = { dashboard: 'Executive QA overview', queue: 'Work queue', sale: `Sale QA · ${lead.id}`, calibration: 'Model calibration', rules: 'Check library', audit: 'Decision ledger' };
+    const crumbs = { dashboard: 'Operations', queue: 'Human attention', sale: `${lead.retailer} · ${lead.product}`, calibration: 'Assurance', rules: 'Configuration', audit: 'Traceability' };
+
+    const kpis = [
+      { label: 'Sales scored', value: '1,284', unit: '', sub: 'Automatically, before submission', color: '#fff' },
+      { label: 'Auto-submitted', value: '1,019', unit: '79.4%', sub: 'First-pass yield, no rework', color: C.pass },
+      { label: 'Held', value: '168', unit: '13.1%', sub: 'Critical fail → TL queue', color: C.fail },
+      { label: 'QA review', value: '97', unit: '7.5%', sub: 'Low confidence, never auto-passed', color: C.review },
+      { label: 'Critical fail rate', value: '13.1', unit: '%', sub: 'Rates and email lead the failures', color: '#fff' },
+      { label: 'Low-confidence checks', value: '2.1', unit: '%', sub: 'Of 24,196 checks executed', color: '#fff' },
+      { label: 'Repeat offences', value: '6', unit: 'agents', sub: 'Same critical failing 3+ times in 7 days', color: C.fail },
+      { label: 'Sampled clean calls', value: '51', unit: '5%', sub: 'Human-audited for calibration', color: accent },
+    ];
+
+    const distribution = [
+      { label: 'AUTO-SUBMIT', count: '1,019', pct: '79.4%', dot: this.dot(C.pass) },
+      { label: 'HOLD', count: '168', pct: '13.1%', dot: this.dot(C.fail) },
+      { label: 'QA REVIEW', count: '97', pct: '7.5%', dot: this.dot(C.review) },
+    ];
+
+    const fc = [['Rates and charges', 'Factual', 62], ['Email captured', 'Factual', 41], ['Recording disclaimer', 'Verbatim', 28], ['DMO read verbatim', 'Verbatim', 19], ['NMI / MIRN verified', 'Factual', 12]];
+    const failingChecks = fc.map(([name, type, count]) => ({ name, type, count, bar: `position:absolute;left:0;top:0;height:100%;width:${(count / 62) * 100}%;background:${count > 40 ? C.fail : 'rgba(255,255,255,.35)'}` }));
+
+    const open = id => () => this.setState({ view: 'sale', leadId: id, drawerKey: null, saved: null, choice: null, reason: '', seg: null });
+
+    const recentFailures = [
+      { lead: '3613790', check: 'Rates and charges', meta: 'Retailer 1 · Agent A', age: '12m', open: open('3613790') },
+      { lead: '3613778', check: 'Recording disclaimer', meta: 'Retailer 1 · Agent B · repeat ×3', age: '48m', open: open('3613778') },
+      { lead: '3613803', check: 'Address match', meta: 'Retailer 2 · Agent C', age: '2h', open: open('3613803') },
+      { lead: '3613766', check: 'Rates and charges', meta: 'Retailer 1 · Agent A · overridden', age: '1d', open: open('3613766') },
+    ];
+    const recentOverrides = [
+      { lead: '3613766', ai: 'HOLD', human: 'PASS', reason: 'Customer corrected the rate at 27:40; agent re-confirmed 31.9c.', who: 'S. Bhandari', time: '17:31' },
+      { lead: '3613701', ai: 'AUTO-SUBMIT', human: 'HOLD', reason: 'Sampled clean call — auditor found an unread cooling-off clause the check scored as present.', who: 'A. Fernandes', time: '11:02' },
+      { lead: '3613688', ai: 'QA REVIEW', human: 'PASS', reason: 'Crosstalk resolved on listen-back; DMO was read verbatim.', who: 'S. Bhandari', time: '09:47' },
+    ];
+
+    const qf = ['All', 'Critical holds', 'Low confidence', 'Repeat offences', 'Human overrides', 'Sampled clean'];
+    const inFilter = l => {
+      const f = S.queueFilter;
+      if (f === 'All') return l.state === 'scored' || l.state === 'error';
+      if (f === 'Critical holds') return l.decision === 'HOLD' && !l.override;
+      if (f === 'Low confidence') return l.decision === 'QA REVIEW';
+      if (f === 'Repeat offences') return !!l.repeat;
+      if (f === 'Human overrides') return !!l.override;
+      return l.decision === 'AUTO-SUBMIT';
+    };
+    const matchRetailer = l => S.retailer === 'All retailers' || l.retailer === S.retailer;
+    const queueFilters = qf.map(label => {
+      const on = S.queueFilter === label;
+      const count = this.leads().filter(l => { const prev = S.queueFilter; return true; }).length;
+      const n = this.leads().filter(l => matchRetailer(l) && ((label === 'All') ? (l.state === 'scored' || l.state === 'error') : (label === 'Critical holds' ? l.decision === 'HOLD' && !l.override : label === 'Low confidence' ? l.decision === 'QA REVIEW' : label === 'Repeat offences' ? !!l.repeat : label === 'Human overrides' ? !!l.override : l.decision === 'AUTO-SUBMIT'))).length;
+      return { label, count: n, on, set: () => this.setState({ queueFilter: label }),
+        style: `display:inline-flex;align-items:center;gap:8px;background:${on ? '#121212' : 'transparent'};border:1px solid ${on ? accent : 'rgba(255,255,255,.145)'};border-radius:0;color:${on ? '#fff' : C.ink};font-family:'Geist Mono',monospace;font-size:12px;padding:7px 11px;cursor:pointer` };
+    });
+
+    const cols = '150px 1.1fr 1.4fr 110px 80px 150px';
+    const queueHeadStyle = `display:grid;grid-template-columns:${cols};gap:14px;padding:12px 18px;border-bottom:${RING};font-family:'Geist Mono',monospace;font-size:11px;color:${C.mute};text-transform:uppercase;letter-spacing:1px;min-width:900px`;
+    const queueRows = this.leads().filter(l => matchRetailer(l) && inFilter(l)).map(l => {
+      const lc = this.checksFor(l);
+      const cf = lc.filter(c => c.status === 'FAIL' && c.critical);
+      const rv = lc.filter(c => c.status === 'REVIEW');
+      const deciding = cf.length ? cf : rv.length ? rv : lc.filter(c => c.critical);
+      const minConf = Math.min(...deciding.map(c => c.conf));
+      const dcol = this.decisionMeta(l.decision).color;
+      const reason = l.state === 'error' ? 'Ingest error — no transcript' : cf.length ? cf.map(c => c.name).join(', ') : rv.length ? `Low confidence · ${rv[0].name}` : l.override ? 'Override recorded' : 'Sampled clean call';
+      return { id: l.id, who: `${l.retailer} · ${l.agent.split(' · ')[0]}`, reason, conf: l.state === 'scored' ? (minConf * 100).toFixed(0) + '%' : '—', confColor: l.state === 'scored' ? this.confColor(minConf) : C.dim,
+        age: this.ageOf(l.date), repeat: !!l.repeat, decision: l.state === 'error' ? 'ERROR' : l.decision, open: open(l.id),
+        chip: this.chip(l.state === 'error' ? C.fail : dcol), dot: this.dot(l.state === 'error' ? C.fail : dcol),
+        style: `display:grid;grid-template-columns:${cols};gap:14px;align-items:center;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(255,255,255,.08);padding:${pad} 18px;cursor:pointer;min-width:900px` };
+    });
+
+    const leadList = this.leads().map(l => {
+      const on = l.id === S.leadId;
+      const col = l.state === 'processing' ? accent : l.state === 'error' ? C.fail : this.decisionMeta(l.decision).color;
+      return { id: l.id, tag: l.tag, sub: l.sub, current: on ? 'true' : undefined, open: open(l.id), dot: this.dot(col),
+        style: `display:block;width:100%;text-align:left;background:${on ? '#121212' : 'transparent'};border:0;border-left:2px solid ${on ? accent : 'transparent'};border-bottom:1px solid rgba(255,255,255,.08);padding:11px 14px;cursor:pointer` };
+    });
+
+    const decisionStats = [
+      { value: String(checks.length), label: 'Checks run', color: '#fff' },
+      { value: String(crit.length), label: 'Critical', color: '#fff' },
+      { value: String(critFails.length), label: 'Critical fails', color: critFails.length ? C.fail : C.mute },
+      { value: String(reviews.length), label: 'Low conf.', color: reviews.length ? C.review : C.mute },
+    ];
+    const mm = Math.floor(lead.dur / 60);
+    const leadMeta = [
+      { k: 'Lead', v: lead.id }, { k: 'Retailer', v: `${lead.retailer} · ${lead.product}` }, { k: 'Agent', v: lead.agent },
+      { k: 'Team lead', v: lead.tl }, { k: 'Call', v: `${lead.date} · ${mm}m` }, { k: 'Checklist', v: 'v1.4 · eff. 2026-09-01' },
+    ];
+
+    const findings = checks.filter(c => c.status !== 'PASS' && c.evidence).sort((a, b) => (b.critical ? 1 : 0) - (a.critical ? 1 : 0)).map(c => ({
+      name: c.name, type: c.type, ts: c.ts, conf: (c.conf * 100).toFixed(0) + '%', rule: `${c.rule} · v1.4`,
+      crit: c.critical ? 'CRITICAL' : 'NON-CRITICAL',
+      banner: c.status === 'REVIEW' ? 'Low confidence — routed to QA' : c.critical ? 'Critical failure' : 'Coaching note — does not block',
+      accent: c.status === 'REVIEW' ? C.review : c.critical ? C.fail : C.mute,
+      observed: c.observed, expected: c.expected, evidence: c.evidence, sourceShort: c.source.split(' · ')[0],
+      confDot: this.dot(this.confColor(c.conf)),
+      cardStyle: `background:#0a0a0a;border:${RING};border-top:2px solid ${c.status === 'REVIEW' ? C.review : c.critical ? C.fail : 'rgba(255,255,255,.18)'};padding:20px`,
+      play: () => this.setState({ drawerKey: c.name, playing: true }),
+      inspect: () => this.setState({ drawerKey: c.name, playing: false }),
+    }));
+
+    const tabs = ['All', 'Verbatim', 'Factual', 'Behaviour'].map(label => {
+      const on = S.tab === label;
+      const n = label === 'All' ? checks.length : checks.filter(c => c.type === label).length;
+      return { label, count: n, on, set: () => this.setState({ tab: label }),
+        style: `background:${on ? '#121212' : 'transparent'};border:1px solid ${on ? accent : 'rgba(255,255,255,.145)'};border-radius:0;color:${on ? '#fff' : C.ink};font-family:'Geist Mono',monospace;font-size:12px;padding:6px 10px;cursor:pointer` };
+    });
+
+    const ccols = '104px 1.4fr 96px 118px 100px 70px 116px';
+    const checkHeadStyle = `display:grid;grid-template-columns:${ccols};gap:12px;padding:12px 18px;border-bottom:${RING};font-family:'Geist Mono',monospace;font-size:11px;color:${C.mute};text-transform:uppercase;letter-spacing:1px;min-width:820px`;
+    const checkRows = checks.filter(c => S.tab === 'All' || c.type === S.tab).map(c => ({
+      name: c.name, type: c.type, ts: c.ts, status: c.status, conf: (c.conf * 100).toFixed(0) + '%',
+      glyph: c.status === 'PASS' ? '✓' : c.status === 'FAIL' ? '✕' : '⚠',
+      color: this.statusColor(c.status), confColor: this.confColor(c.conf),
+      crit: c.critical ? 'CRITICAL' : 'non-critical', critColor: c.critical ? C.ink : C.mute,
+      ev: c.evidence ? 'Inspect →' : 'Transcript →',
+      inspect: () => this.setState({ drawerKey: c.name, playing: false }),
+      style: `display:grid;grid-template-columns:${ccols};gap:12px;align-items:center;width:100%;text-align:left;background:${S.drawerKey === c.name ? '#121212' : 'transparent'};border:0;border-bottom:1px solid rgba(255,255,255,.08);padding:${pad} 18px;cursor:pointer;min-width:820px`,
+    }));
+
+    const markers = checks.filter(c => this.secs(c.ts) != null).map(c => {
+      const pct = (this.secs(c.ts) / lead.dur) * 100;
+      const col = this.statusColor(c.status);
+      const big = c.status !== 'PASS';
+      return { aria: `${c.name} · ${c.status} at ${c.ts}`, select: () => this.setState({ drawerKey: c.name, seg: c.ts, playing: false }),
+        style: `position:absolute;top:${big ? 8 : 12}px;left:${pct}%;transform:translateX(-50%);width:${big ? 12 : 8}px;height:${big ? 12 : 8}px;background:${col};border:0;padding:0;cursor:pointer;border-radius:0` };
+    });
+    const daCheck = checks.find(c => c.name === 'Dead air' && c.status === 'FAIL');
+    const deadAir = daCheck ? [{ style: `position:absolute;top:14px;left:${(this.secs(daCheck.ts) / lead.dur) * 100}%;width:3%;height:6px;background:rgba(255,255,255,.22)` }] : [];
+
+    const segSets = {
+      '3613790': [
+        ['00:12', 'Agent', 'This call is being recorded for quality and compliance purposes. Do you consent to the recording?', 'pass'],
+        ['02:41', 'Customer', 'Yes, that\'s me — I\'m the account holder on the bill.', 'pass'],
+        ['09:55', 'Agent', 'I need to read you the Default Market Offer comparison in full before we go further.', 'pass'],
+        ['14:02', 'Agent', 'So your peak usage will be charged at twenty-eight point six cents per kilowatt hour.', 'fail'],
+        ['18:30', 'System', '[silence 18:30 → 19:17 · 47s dead air]', 'note'],
+        ['22:10', 'Agent', 'Let me read that back — j dot smith at g-m-i-a-l dot com, is that right?', 'fail'],
+        ['25:40', 'Agent', 'Here are the terms and conditions that apply to this plan.', 'pass'],
+        ['26:58', 'Agent', 'You have a ten business day cooling-off period from today.', 'pass'],
+      ],
+      '3613811': [
+        ['00:12', 'Agent', 'This call is being recorded for quality and compliance purposes.', 'pass'],
+        ['09:48', 'Agent', 'The Default Market Offer for your [crosstalk] compared to the plan we discussed…', 'review'],
+        ['10:06', 'Customer', 'Sorry — say that again, the line dropped out for a second.', 'review'],
+        ['17:05', 'Agent', 'Is anyone at the property registered for life support equipment?', 'pass'],
+      ],
+      '3613778': [
+        ['00:04', 'Agent', 'Hi, am I speaking with the account holder? Great, let\'s look at your bill.', 'fail'],
+        ['02:10', 'Customer', 'Sure, I\'ve got it here in front of me.', 'pass'],
+        ['06:12', 'Agent', 'Can you read me the NMI from the top right of that bill?', 'pass'],
+      ],
+      '3613766': [
+        ['14:02', 'Agent', 'Peak is thirty point nine cents per kilowatt hour.', 'fail'],
+        ['27:40', 'Customer', 'My paperwork says thirty-one point nine, not thirty point nine.', 'note'],
+        ['27:52', 'Agent', 'You\'re right — sorry, that\'s thirty-one point nine cents peak.', 'pass'],
+      ],
+      '3613803': [
+        ['03:20', 'Agent', 'That\'s unit four, twelve Barker Street — correct?', 'fail'],
+        ['04:05', 'Customer', 'Date of birth is the eleventh of March, nineteen eighty-eight.', 'pass'],
+      ],
+      '3613824': [
+        ['00:10', 'Agent', 'This call is being recorded for quality and compliance purposes.', 'pass'],
+        ['12:14', 'System', '[silence 12:14 → 12:52 · 38s dead air]', 'note'],
+        ['19:30', 'Agent', 'Your connection date is confirmed for the twenty-fourth.', 'pass'],
+      ],
+      '3613742': [
+        ['00:12', 'Agent', 'This call is being recorded for quality and compliance purposes.', 'pass'],
+        ['14:02', 'Agent', 'Peak is thirty-one point nine cents per kilowatt hour, off-peak is lower.', 'pass'],
+        ['22:10', 'Agent', 'Reading your email back: j dot smith at gmail dot com.', 'pass'],
+      ],
+    };
+    const segColors = { pass: C.ink, fail: C.fail, review: C.review, note: C.mute };
+    const segments = (segSets[lead.id] || []).map(([ts, speaker, text, kind]) => {
+      const on = S.seg === ts;
+      return { ts, speaker, text, select: () => this.setState({ seg: ts }),
+        speakerColor: speaker === 'Agent' ? accent : speaker === 'Customer' ? C.mute : C.dim,
+        textColor: segColors[kind],
+        style: `display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:${on ? '#121212' : 'transparent'};border:0;border-left:2px solid ${on ? accent : 'transparent'};border-bottom:1px solid rgba(255,255,255,.06);padding:10px 12px;cursor:pointer` };
+    });
+
+    const lineageBase = [
+      ['09:02:14', 'Lead created', 'CRM', '—', 'OPEN'],
+      ['14:32:06', 'Recording received', 'Dialler API · lead-keyed', 'ingest v2', 'MEDIA_OK'],
+      ['14:32:51', 'Transcript generated', 'ASR · speaker-separated', 'asr v3.2', 'TRANSCRIPT_OK'],
+      ['14:33:02', 'Transcript normalised', 'Pipeline', 'norm v1.1', 'NORMALISED'],
+      ['14:33:03', 'Rule set loaded', 'Check library', 'Retailer 1 v1.4', 'RULES_PINNED'],
+      ['14:33:09', 'Checks executed', 'Scoring engine', 'engine v0.9', `${checks.length} RESULTS`],
+      ['14:33:09', 'Evidence captured', 'Scoring engine', '—', 'EVIDENCE_OK'],
+      ['14:33:10', 'Confidence evaluated', 'Scoring engine', '—', 'MIN 0.88'],
+      ['14:33:10', 'Gate decision', 'Gate', 'gate v1.0', lead.decision],
+    ];
+    const savedEvent = S.saved ? [['14:37:02', 'Human override', 'QA Analyst · S. Bhandari', '—', S.saved.choice]] : [];
+    const overrideEvent = lead.override ? [['17:31:40', 'Human override', lead.override.who, '—', lead.override.human]] : [];
+    const allEvents = lineageBase.concat(overrideEvent, savedEvent);
+    const stateColor = st => st === 'HOLD' || st === 'ERROR' ? C.fail : st === 'AUTO-SUBMIT' || st === 'PASS' ? C.pass : st === 'QA REVIEW' ? C.review : C.mute;
+    const lineage = allEvents.map((e, i) => ({ time: e[0], label: e[1], actor: e[3] === '—' ? e[2] : `${e[2]} · ${e[3]}`,
+      color: i === allEvents.length - 1 ? stateColor(e[4]) : C.ink,
+      rail: `display:block;width:8px;height:8px;background:${i === allEvents.length - 1 ? stateColor(e[4]) : 'rgba(255,255,255,.3)'};margin-top:5px` }));
+    const acols = '110px 1.1fr 1.3fr 150px 140px';
+    const ledger = allEvents.map(e => ({ time: e[0], event: e[1], actor: e[2], version: e[3], state: e[4], color: stateColor(e[4]),
+      style: `display:grid;grid-template-columns:${acols};gap:14px;padding:${pad} 18px;border-bottom:1px solid rgba(255,255,255,.08);min-width:860px` }));
+
+    const overrideOptions = [
+      { label: 'Agree with AI', value: lead.decision },
+      { label: lead.decision === 'AUTO-SUBMIT' ? 'Override → HOLD' : 'Override → PASS', value: lead.decision === 'AUTO-SUBMIT' ? 'HOLD' : 'PASS' },
+    ].map(o => {
+      const on = S.choice === o.value;
+      return { label: o.label, on, set: () => this.setState({ choice: o.value }),
+        style: `flex:1;background:${on ? '#fff' : 'transparent'};color:${on ? '#121212' : C.ink};border:1px solid ${on ? '#fff' : 'rgba(255,255,255,.145)'};border-radius:0;font-family:'Geist Mono',monospace;font-size:12px;padding:10px;cursor:pointer` };
+    });
+    const canConfirm = !!S.choice && S.reason.trim().length > 3;
+
+    const ruleSets = [
+      { retailer: 'Retailer 1', checklist: 'Energy QA checklist', version: 'v1.4', effective: '2026-09-01', live: true },
+      { retailer: 'Retailer 1', checklist: 'Energy QA checklist', version: 'v1.3', effective: '2026-06-15', live: false },
+      { retailer: 'Retailer 2', checklist: 'Energy QA checklist', version: 'v2.1', effective: '2026-08-12', live: true },
+      { retailer: 'Retailer 3', checklist: 'Broadband QA checklist', version: 'v1.0', effective: '2026-07-01', live: true },
+    ].map((r, i) => {
+      const on = S.ruleSet === i;
+      return { ...r, current: on ? 'true' : undefined, select: () => this.setState({ ruleSet: i }),
+        chip: this.chip(r.live ? C.pass : C.mute),
+        style: `display:block;width:100%;text-align:left;background:${on ? '#121212' : 'transparent'};border:0;border-left:2px solid ${on ? accent : 'transparent'};border-bottom:1px solid rgba(255,255,255,.08);padding:14px 16px;cursor:pointer` };
+    });
+    const rs = ruleSets[S.ruleSet];
+    const rcols = '1.5fr 96px 96px 80px 1.4fr';
+    const ruleHeadStyle = `display:grid;grid-template-columns:${rcols};gap:12px;padding:12px 20px;border-bottom:${RING};font-family:'Geist Mono',monospace;font-size:11px;color:${C.mute};text-transform:uppercase;letter-spacing:1px;min-width:760px`;
+    const weights = { Verbatim: '8', Factual: '10', Behaviour: '3' };
+    const ruleRows = this.catalogue().map(([name, type, critical, ts, conf, rule, source]) => ({
+      name, type, source, weight: weights[type], crit: critical ? 'YES' : 'no', critColor: critical ? C.ink : C.mute,
+      style: `display:grid;grid-template-columns:${rcols};gap:12px;padding:${pad} 20px;border-bottom:1px solid rgba(255,255,255,.08);min-width:760px`,
+    }));
+
+    const calKpis = [
+      { label: 'AI / auditor agreement', value: '94.2', unit: '%', sub: '312 sampled calls', color: C.pass },
+      { label: 'Critical false-pass', value: '0', unit: '', sub: 'The release-blocking metric', color: C.pass },
+      { label: 'Critical false-fail', value: '3', unit: '', sub: 'Held sales a human then passed', color: C.review },
+      { label: 'Auditor-to-auditor', value: '91.6', unit: '%', sub: 'Humans disagree with each other too', color: '#fff' },
+    ];
+    const cb = [['0.5', 4], ['0.6', 9], ['0.7', 18], ['0.8', 46], ['0.85', 97], ['0.9', 214], ['0.95', 381], ['1.0', 268]];
+    const confBuckets = cb.map(([label, n]) => ({ label, n, bar: `width:100%;height:${Math.max(4, (n / 381) * 118)}px;background:${(+label) < 0.85 ? C.review : 'rgba(255,255,255,.35)'}` }));
+    const dg = [['Behaviour · dead air threshold', 16], ['Verbatim · crosstalk windows', 11], ['Factual · address formatting', 9], ['Verbatim · paraphrased DMO', 5]];
+    const disagreements = dg.map(([name, n]) => ({ name, n, bar: `position:absolute;left:0;top:0;height:100%;width:${(n / 16) * 100}%;background:${accent}` }));
+
+    const dkey = S.drawerKey;
+    const dc = dkey ? checks.find(c => c.name === dkey) : null;
+    const dv = dc ? {
+      name: dc.name, type: dc.type, status: dc.status, ts: dc.ts === '—' ? 'whole call' : dc.ts,
+      crit: dc.critical ? 'CRITICAL' : 'NON-CRITICAL', critColor: dc.critical ? C.ink : C.mute,
+      statusChip: this.chip(this.statusColor(dc.status)), statusDot: this.dot(this.statusColor(dc.status)),
+      observed: dc.observed || 'Matched the approved value in the transcript.',
+      observedColor: dc.status === 'PASS' ? C.pass : dc.status === 'REVIEW' ? C.review : C.fail,
+      expected: dc.expected || 'As defined by the check source.', source: dc.source,
+      evidence: dc.evidence || 'No exception captured — the check passed against the source of truth.',
+      why: dc.why || `Compared the transcript against ${dc.source} under ${dc.rule}. Values agree within tolerance, so the check passes and contributes no block to the gate.`,
+      conf: (dc.conf * 100).toFixed(0) + '%', confColor: this.confColor(dc.conf),
+      confBar: `position:absolute;left:0;top:0;height:100%;width:${dc.conf * 100}%;background:${this.confColor(dc.conf)}`,
+      rule: `${dc.rule} · v1.4`,
+      play: () => this.setState({ playing: true }),
+    } : {};
+
+    return {
+      shellDir: S.narrow ? 'column' : 'row',
+      navStyle: S.narrow
+        ? `background:#0a0a0a;border-bottom:${RING};padding:14px 12px;display:flex;flex-direction:column;gap:10px`
+        : `width:208px;flex:none;background:#0a0a0a;border-right:${RING};padding:20px 0 24px;display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100vh;overflow:auto;box-sizing:border-box`,
+      navListStyle: S.narrow ? 'display:flex;gap:4px;overflow-x:auto' : 'display:flex;flex-direction:column',
+      navFootStyle: S.narrow ? 'display:none' : 'margin-top:auto;padding:0 14px',
+      navItems, crumb: crumbs[S.view], viewTitle: titles[S.view],
+      retailer: S.retailer, range: S.range,
+      setRetailer: e => this.setState({ retailer: e.target.value }),
+      setRange: e => this.setState({ range: e.target.value }),
+      isDashboard: S.view === 'dashboard', isQueue: S.view === 'queue', isSale: S.view === 'sale',
+      isCalibration: S.view === 'calibration', isRules: S.view === 'rules', isAudit: S.view === 'audit',
+      kpiCols: S.narrow ? 'repeat(auto-fit,minmax(180px,1fr))' : 'repeat(4,minmax(0,1fr))',
+      kpis, distribution, failingChecks, recentFailures, recentOverrides, goQueue: go('queue'), goAudit: go('audit'), goSale: go('sale'),
+      queueFilters, queueHeadStyle, queueRows,
+      saleCols: S.narrow ? '1fr' : '248px minmax(0,1fr)',
+      leadListStyle: `background:#0a0a0a;border:${RING};${S.narrow ? 'max-height:240px;overflow:auto' : 'position:sticky;top:84px;max-height:calc(100vh - 140px);overflow:auto'}`,
+      leadList, leadId: lead.id,
+      stateProcessing: lead.state === 'processing', stateError: lead.state === 'error', stateScored: lead.state === 'scored',
+      pipeline: [
+        ['Recording received', 'done'], ['Transcript generated', 'done'], ['Transcript normalised', 'done'],
+        ['Rule set pinned · v1.4', 'done'], ['Checks executing', 'running'], ['Gate decision', 'queued'],
+      ].map(([label, st]) => ({ label, state: st === 'done' ? 'complete' : st === 'running' ? '14 of 20' : 'pending',
+        color: st === 'queued' ? C.dim : C.ink,
+        dot: `width:6px;height:6px;border-radius:100px;display:block;background:${st === 'done' ? C.pass : st === 'running' ? accent : 'rgba(255,255,255,.2)'}${st === 'running' ? ';animation:qapulse 1s ease-in-out infinite' : ''}` })),
+      decision: lead.decision, decisionColor: dm.color, decisionReason: lead.reason, decisionRule: dm.rule,
+      decisionDot: this.dot(dm.color), decisionStats, leadMeta,
+      decisionStyle: `background:#0a0a0a;border:${RING};border-left:3px solid ${dm.color};padding:24px`,
+      hasOverride: !!lead.override, overrideAi: lead.override && lead.override.ai, overrideHuman: lead.override && lead.override.human,
+      overrideReasonText: lead.override && lead.override.reason, overrideWho: lead.override && lead.override.who, overrideTime: lead.override && lead.override.time,
+      findings, noFindings: findings.length === 0,
+      emptyNote: `All ${crit.length} critical checks matched their source of truth. This sale was submitted without human touch; it remains eligible for the 5% calibration sample.`,
+      durLabel: `${mm}:00`, markers, deadAir, segments,
+      tabs, checkHeadStyle, checkRows,
+      overrideOptions, reasonDraft: S.reason, setReason: e => this.setState({ reason: e.target.value }),
+      confirmDisabled: !canConfirm,
+      confirmStyle: `width:100%;margin-top:12px;background:${canConfirm ? '#fff' : '#1f1f1f'};color:${canConfirm ? '#121212' : C.dim};border:0;border-radius:0;padding:12px;font-size:13px;font-weight:500;cursor:${canConfirm ? 'pointer' : 'not-allowed'}`,
+      confirmOverride: () => { if (canConfirm) this.setState({ saved: { choice: S.choice, reason: S.reason } }); },
+      overrideSaved: !!S.saved, savedChoice: S.saved && S.saved.choice, savedReason: S.saved && S.saved.reason,
+      lineage, ledger, auditHeadStyle: `display:grid;grid-template-columns:${acols};gap:14px;padding:12px 18px;border-bottom:${RING};font-family:'Geist Mono',monospace;font-size:11px;color:${C.mute};text-transform:uppercase;letter-spacing:1px;min-width:860px`,
+      rulesCols: S.narrow ? '1fr' : '280px minmax(0,1fr)',
+      ruleSets, ruleHeadStyle, ruleRows, activeRuleSet: `${rs.retailer} · ${rs.checklist}`,
+      activeRuleMeta: `${rs.version} · effective ${rs.effective}${rs.live ? '' : ' · superseded'}`, activeRuleCount: 20,
+      calKpis, confBuckets, disagreements,
+      drawer: !!dc, dv, playing: S.playing, closeDrawer: () => this.setState({ drawerKey: null, playing: false }),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
