@@ -12,7 +12,7 @@ import re
 from difflib import SequenceMatcher
 
 from ...config import settings
-from .base import CheckOutcome, EvaluationContext, EvidenceData, ResultStatus, TranscriptSegmentData
+from .base import CheckOutcome, EvaluationContext, EvidenceData, ResultStatus, TranscriptSegmentData, not_evaluable_outcome
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -45,15 +45,16 @@ def evaluate_verbatim(check_config: dict, context: EvaluationContext) -> CheckOu
     # itself is normally spoken by the agent.
     window_segments = context.segments_in_window(window_start, window_end)
 
-    if not expected_phrase or not candidates:
-        return CheckOutcome(
-            status=ResultStatus.PASS,
-            confidence=check_config.get("default_confidence", 0.95),
-            observed=None,
-            expected=None,
-            rationale="No script configured for independent verification in this demo; treated as compliant by default.",
-            evidence=None,
-            timestamp_seconds=None,
+    if not expected_phrase:
+        return not_evaluable_outcome(
+            "This check has no approved-script phrase configured, so it cannot be independently verified "
+            "from the data available in this demo."
+        )
+    if not candidates:
+        return not_evaluable_outcome(
+            f"No {speaker.lower()} utterance exists in the required window at all — there is nothing to "
+            "compare the approved script against, so this is routed to a human rather than assumed absent or present.",
+            expected=expected_label,
         )
 
     scored = [(seg, _similarity(expected_phrase, seg.text)) for seg in candidates]

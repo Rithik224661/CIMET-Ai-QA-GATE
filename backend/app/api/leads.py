@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 from ..db import get_db
 from ..enums import Decision, LeadState
 from ..models import Lead
-from ..schemas import LeadOut, LeadsListOut
-from ..serializers import serialize_lead
+from ..schemas import LeadOut, LeadsListOut, SubmissionOut
+from ..serializers import serialize_lead, serialize_submission
 
 router = APIRouter(tags=["leads"])
 
@@ -22,6 +22,7 @@ def _lead_query(db: Session):
         joinedload(Lead.checklist_version),
         joinedload(Lead.transcript),
         joinedload(Lead.decision),
+        joinedload(Lead.submission_record),
         joinedload(Lead.ingest_error),
         joinedload(Lead.reviews),
         joinedload(Lead.results),
@@ -100,3 +101,15 @@ def get_lead_timeline(lead_id: str, db: Session = Depends(get_db)):
     timeline; the frontend derives markers from `results[].timestamp`
     against it."""
     return get_lead(lead_id, db)
+
+
+@router.get("/api/leads/{lead_id}/submission", response_model=SubmissionOut)
+def get_lead_submission(lead_id: str, db: Session = Depends(get_db)):
+    """The submission boundary (brief §11) — 404 until (unless) the lead's
+    decision is AUTO_SUBMIT, since HOLD/QA_REVIEW leads never submit."""
+    lead = db.execute(_lead_query(db).where(Lead.id == lead_id)).unique().scalar_one_or_none()
+    if lead is None:
+        raise HTTPException(status_code=404, detail="lead not found")
+    if lead.submission_record is None:
+        raise HTTPException(status_code=404, detail="lead has not been submitted (decision is not AUTO_SUBMIT)")
+    return serialize_submission(lead.submission_record)

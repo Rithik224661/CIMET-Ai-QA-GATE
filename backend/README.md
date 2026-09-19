@@ -29,7 +29,7 @@ The frontend (`../`) reads `BACKEND_URL` (default `http://localhost:8000`)
 ## Tests
 
 ```bash
-python -m pytest        # 81 tests: unit, API integration, the brief's 8
+python -m pytest        # 101 tests: unit, API integration, the brief's 8
                          # end-to-end scenarios, adversarial cases
 ```
 
@@ -45,26 +45,43 @@ FastAPI routes (app/api/*)
   -> SQLite (cimet.db)
 ```
 
-- **`app/services/gate.py`** — the deterministic gate. Pure functions, no
-  I/O, no model call: `criticalFails > 0 → HOLD; anyConfidence < floor →
-  QA_REVIEW; else AUTO_SUBMIT`. Mirrors the frontend's
-  `src/lib/gate.ts` so both are independently testable against the same
-  rule.
+- **`app/services/gate.py`** — the SOLE AUTHORITATIVE deterministic gate
+  (the frontend never independently decides a final business outcome; it
+  only displays this outcome). Pure functions, no I/O, no model call:
+  `criticalFails > 0 → HOLD; any CRITICAL check's confidence < floor →
+  QA_REVIEW; else AUTO_SUBMIT`. Non-critical confidence never gates the
+  decision. Mirrors the frontend's `src/lib/gate.ts` (kept as a pure,
+  unit-tested reference, not on the live path).
 - **`app/services/evaluators/`** — `verbatim.py` (normalized-text
   similarity, difflib), `factual.py` (regex extraction + tolerance
-  comparison against a `crm_snapshot` source of truth), `behaviour.py`
-  (transcript-only heuristics, never critical). All three return a
-  structured `CheckOutcome` (status, confidence, observed, expected,
-  evidence, rationale) — never a bare pass/fail string, and never an LLM
-  call. See the module docstrings for exactly what's genuinely extracted
-  vs. a documented pass-through default (14 of the 20 checks in the one
-  checklist export don't have bespoke extraction configured — see
-  `app/seed_data.py`'s `CHECK_CATALOGUE` and `../docs/DECISIONS.md`).
+  comparison against a `crm_snapshot` source of truth; also `presence`
+  and `skip_if_absent` modes), `behaviour.py` (transcript-only
+  heuristics — dead air, crosstalk-based interruptions, talk-time-share
+  rapport, objection-keyword-plus-response — never critical). All three
+  return a structured `CheckOutcome` (status, confidence, observed,
+  expected, evidence, rationale) — never a bare pass/fail string, and
+  never an LLM call. **20/20 checks in the catalogue resolve to a real
+  evaluator strategy — zero unconditional-PASS pass-throughs.** See
+  `../docs/CHECK_AUDIT.md` for the full per-check table and
+  `../docs/DECISIONS.md` for what's genuinely NLP-verified vs. an
+  honestly-documented heuristic. A check that genuinely can't be
+  evaluated (misconfiguration, or an evaluator exception) becomes
+  `not_evaluable_outcome` — REVIEW status at a confidence that always
+  trips the gate floor — never a silent PASS.
 - **`app/services/pipeline.py`** — orchestrates the above per lead,
   persists `CheckResult`/`Evidence`/`GateDecision`, and writes the
-  ingest + evaluation audit trail. Idempotent: re-running a lead clears
-  its previous result set rather than accumulating duplicates (brief
-  §41 idempotency).
+  ingest + evaluation audit trail. Each check's evaluator call is wrapped
+  so one evaluator's exception can't crash the whole lead's evaluation
+  (degrades to `not_evaluable_outcome` instead). Idempotent: re-running a
+  lead clears its previous result set (and any prior `Submission`) rather
+  than accumulating duplicates (brief §41 idempotency).
+- **`app/services/submission.py`** — the demonstrable submission boundary
+  (brief §11): `GateDecision → Submission Service → SUBMITTED`. Only
+  `AUTO_SUBMIT` ever produces a `Submission` row (enforced by a
+  `ValueError` guard, not just convention) — HOLD/QA_REVIEW never submit.
+  `MockSubmissionAdapter` is a clearly-labeled **DEMO/MOCK sandbox**
+  (`"sandbox": "DEMO_MOCK"` on every payload) — no real CIMET CRM
+  submission endpoint exists.
 - **`app/services/rule_resolution.py`** — resolves a lead's checklist
   version by `(retailer, call_date)`, never "today's" version.
 - **`app/services/repeat_offence.py`** — same critical check failing 3+
@@ -98,11 +115,15 @@ verbatim match thresholds, dead-air threshold, AI provider, CORS origins.
   rule-set rows exist for navigation only. `resolve_rule_version` itself
   is retailer/date-correct (tested with multiple retailers and versions)
   for when more checklist exports arrive.
-- 14 of the 20 checks have no bespoke extraction wired (documented
-  pass-through, not a fabricated PASS — see the evaluator docstrings);
-  the 6 that anchor the brief's worked example (disclaimer, DMO, rate,
-  email, address, dead air) are genuinely computed from transcript text
-  against a `crm_snapshot` source of truth.
-- No real CIMET dialler/sandbox integration — `MockIngestionAdapter` only.
-  `CIMETSandboxAdapter` is a boundary stub pending real credentials/schema.
+- 3 of the 20 checks (Rapport, Interruptions, Objection handling) use
+  honestly-limited deterministic heuristics rather than a full
+  sentiment/prosody classifier — real, transcript-derived signal, not
+  fabricated, but not claimed to be more sophisticated than it is. See
+  `../docs/CHECK_AUDIT.md`.
+- No real CIMET dialler/sandbox/CRM-submission integration —
+  `MockIngestionAdapter` and `MockSubmissionAdapter` only, both clearly
+  labeled DEMO/MOCK. `CIMETSandboxAdapter` is a boundary stub pending real
+  credentials/schema.
 - Redaction is regex-heuristic, not a PCI-grade DLP system.
+- DOB comparison does light text normalization (case/whitespace), not
+  full date-format parsing — a real system would want the latter.

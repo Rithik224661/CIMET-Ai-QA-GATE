@@ -2,10 +2,26 @@
 The deterministic gate. Pure functions only — no database session, no I/O,
 no model call. This is the one place the sale/hold/review decision is made,
 and it is never delegated to an LLM (CLAUDE.md #6, brief §05 "Gate logic").
+This backend module is the SOLE AUTHORITATIVE gate — the frontend never
+independently decides a final business outcome; it only displays the
+`GateOutcome` this function returns (see docs/DECISIONS.md, "single source
+of truth for the gate").
 
-Mirrors frontend src/lib/gate.ts exactly (same three-branch rule, same
-precedence), so the two are independently testable against the same truth
-and can't silently drift into different policies.
+Mirrors frontend src/lib/gate.ts's shape and precedence (kept as a pure,
+unit-tested reference implementation — not on the live decision path, see
+src/lib/data/leads.ts's gateForLead()).
+
+Low confidence is scoped to CRITICAL checks only: a non-critical
+behavioural heuristic (rapport, interruptions, objection handling) being
+honestly uncertain is coaching signal, never a reason to escalate a call a
+human didn't need to see — brief §15 "never critical, never blocking" and
+§20's gate pseudocode ("any APPLICABLE CRITICAL check = LOW_CONFIDENCE").
+A critical check that could not be evaluated at all is represented as
+REVIEW status + confidence below the floor (see evaluators/base.py's
+`not_evaluable_outcome`), which routes here identically to a low-confidence
+PASS/FAIL — "not evaluable" and "low confidence" collapse into the same
+mechanism deliberately, per brief §10's "required checks incomplete/not
+evaluable -> QA_REVIEW".
 """
 
 from __future__ import annotations
@@ -34,9 +50,11 @@ class GateOutcome:
 
 
 def evaluate_gate(checks: list[GateCheckInput]) -> GateOutcome:
-    """criticalFails > 0 -> HOLD; anyConfidence < floor -> QA_REVIEW; else AUTO_SUBMIT."""
+    """criticalFails > 0 -> HOLD; any CRITICAL check's confidence < floor ->
+    QA_REVIEW; else AUTO_SUBMIT. Non-critical confidence never gates the
+    decision — see module docstring."""
     critical_fails = sum(1 for c in checks if c.critical and c.status == ResultStatus.FAIL)
-    low_confidence = sum(1 for c in checks if c.confidence < settings.confidence_floor)
+    low_confidence = sum(1 for c in checks if c.critical and c.confidence < settings.confidence_floor)
     non_critical_fails = sum(1 for c in checks if not c.critical and c.status == ResultStatus.FAIL)
     critical_checks = sum(1 for c in checks if c.critical)
 
@@ -59,7 +77,7 @@ def evaluate_gate(checks: list[GateCheckInput]) -> GateOutcome:
 
 _GATE_RULES = {
     Decision.AUTO_SUBMIT: "Gate rule: all criticals pass → submit without human touch.",
-    Decision.QA_REVIEW: "Gate rule: low confidence on any check → route to QA, never auto-pass.",
+    Decision.QA_REVIEW: "Gate rule: low confidence on any critical check → route to QA, never auto-pass.",
     Decision.HOLD: "Gate rule: any critical fail → hold, route to the TL queue.",
 }
 
@@ -83,7 +101,7 @@ def describe_decision(outcome: GateOutcome, *, repeat_offence: bool = False, ove
     if outcome.decision == Decision.QA_REVIEW:
         if outcome.low_confidence == 1:
             return "Insufficient confidence on a critical check. Never auto-passed."
-        return f"Insufficient confidence on {outcome.low_confidence} checks. Never auto-passed."
+        return f"Insufficient confidence on {outcome.low_confidence} critical checks. Never auto-passed."
 
     base = (
         f"All {outcome.critical_checks} critical checks passed."

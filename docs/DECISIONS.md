@@ -181,3 +181,113 @@ Brief §3 calls for "SQLite for local/hackathon reliability" explicitly —
 followed as specified. No async DB driver, no connection pool tuning: this
 is sized for a live demo, not concurrent production traffic. Revisit
 (Postgres, async SQLAlchemy) before any real multi-user deployment.
+
+---
+
+# Phase 3 decisions (rubric closure / false-pass elimination)
+
+See `docs/CHECK_AUDIT.md` for the full per-check table. Summary of what
+changed and why.
+
+## Low-confidence gate scoping — critical checks only
+
+`evaluate_gate()`'s QA_REVIEW branch now only counts **critical** checks
+with confidence below the floor (`low_confidence = sum(c.critical and
+c.confidence < floor)`), not any check. Non-critical confidence never
+gates the decision. This resolves a real tension: once all 20 checks are
+genuinely evaluated, 3 of them (the Behaviour heuristics) are honestly
+lower-confidence by nature — if their uncertainty gated the decision the
+same way a critical check's does, essentially every call would route to
+QA_REVIEW regardless of whether anything critical was actually wrong,
+which is both wrong (brief §15: behaviour checks are "never critical,
+never blocking") and would have made the demo unusable. Implemented
+identically in both the backend (`app/services/gate.py`, authoritative)
+and the frontend's pure reference implementation (`src/lib/gate.ts`, kept
+in sync and unit-tested, not on the live decision path). Verified this
+doesn't change any of the 9 named scenarios' expected decisions (all still
+pass in `tests/test_scenarios_e2e.py`).
+
+## NOT_EVALUABLE is REVIEW + confidence always below the floor, not a new status
+
+Rather than add a fourth `ResultStatus` value (which would have required
+a frontend change, explicitly out of scope for this pass), "genuinely
+could not evaluate this check" is represented as `REVIEW` status at a
+fixed sub-floor confidence (`NOT_EVALUABLE_CONFIDENCE = 0.4`, see
+`evaluators/base.py`). For a critical check this routes the gate to
+QA_REVIEW; for a non-critical check it's a visible, honest "couldn't
+verify" note that never blocks. This reuses the frontend's existing
+approved PASS/FAIL/REVIEW vocabulary and glyphs unchanged.
+
+## Presence-mode and skip_if_absent are new factual evaluator modes, not new checks
+
+Two checks ("Account holder confirmed", "Life support declared") aren't
+value comparisons — they're "was this confirmed at all". A new `kind:
+"presence"` mode searches for a configured confirmation pattern; found →
+PASS, not found → NOT_EVALUABLE (never FAIL — a keyword miss isn't proof
+the confirmation didn't happen, and this check must never manufacture a
+false critical failure on phrasing alone).
+
+Two other checks ("Concession applied", "Gift card value") only apply
+when the CRM source of truth says something was actually offered. A new
+`skip_if_absent: true` flag makes PASS the *correct* answer when the field
+is empty/falsy (nothing to verify against), falling through to normal
+extraction+comparison when it isn't — this is not the same as the old
+dangerous default: the old default PASSed regardless of whether the field
+existed; this only PASSes when the source of truth itself says there's
+nothing to check.
+
+## Behaviour heuristics are real, not LLM prompts, and honestly limited
+
+Per explicit instruction, the 3 previously-pass-through Behaviour checks
+were NOT replaced with LLM calls dressed up as "AI evaluation" — that
+would trade demo reliability (network dependency, latency, a possible API
+key requirement) for the appearance of sophistication without actually
+being more trustworthy. Instead:
+
+- **Interruptions**: counts `[crosstalk]` markers in the transcript — the
+  one genuine overlapping-speech signal this transcript format captures.
+- **Rapport**: customer-vs-agent talk-time share from real segment
+  durations — a crude but genuinely-computed engagement proxy.
+- **Objection handling**: objection-language keyword match on a customer
+  turn, followed by a check for whether an agent turn came after it.
+
+All three are deterministic, fast, and documented as honestly limited
+(see each evaluator's docstring and `docs/CHECK_AUDIT.md`) rather than
+overstated as a "semantic classifier" with more sophistication than a
+short synthetic transcript can actually support.
+
+## The submission boundary is a labeled DEMO/MOCK sandbox
+
+`app/services/submission.py`'s `MockSubmissionAdapter` is the only
+adapter wired up — no real CIMET CRM submission endpoint exists. Every
+payload it produces carries `"sandbox": "DEMO_MOCK"` explicitly, and only
+an `AUTO_SUBMIT` `GateDecision` ever reaches it (enforced by a `ValueError`
+guard in `submit_if_auto_submitted`, not just by convention) — HOLD and
+QA_REVIEW have no code path that creates a `Submission` row. Idempotent:
+re-evaluating a lead replaces its prior `Submission` rather than
+accumulating duplicates, matching the existing `CheckResult`/`GateDecision`
+re-evaluation behavior.
+
+## Evaluator exceptions degrade to NOT_EVALUABLE, never crash or silently pass
+
+`pipeline.run_evaluation()` now wraps each check's evaluator call in a
+try/except; a raised exception becomes the same `not_evaluable_outcome`
+(REVIEW, sub-floor confidence) as a genuinely missing input, logged via
+the standard `logging` module (never printing transcript content or
+secrets). One broken evaluator can no longer take down the whole lead's
+evaluation, and can never silently resolve to PASS.
+
+## Digit-form transcript numbers, extended with more CRM fields
+
+The transcript-authoring helper (`seed_data.py`'s `common_turns()`) now
+generates the compliant baseline for every one of the newly-wired checks
+(account-holder confirmation, DOB, fuel type, NMI, life-support Q&A,
+move-in date, T&Cs, EIC, cooling-off) alongside the original 6. Every
+named scenario calls it with only the parameters its own narrative
+overrides, so every check *other than* the one(s) a scenario is about
+genuinely evaluates from real transcript content — not a status set by
+hand. `crm_snapshot["date_of_birth"]` is stored pre-normalized
+("11th of march, 1988") to match the transcript's natural phrasing exactly
+— the DOB evaluator does light case/whitespace normalization, not full
+date-format parsing (a real system would want the latter; out of scope for
+this pass).

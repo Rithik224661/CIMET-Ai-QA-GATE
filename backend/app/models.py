@@ -112,6 +112,7 @@ class Lead(Base):
     transcript: Mapped["Transcript | None"] = relationship(back_populates="lead", uselist=False)
     results: Mapped[list["CheckResult"]] = relationship(back_populates="lead", order_by="CheckResult.id")
     decision: Mapped["GateDecision | None"] = relationship(back_populates="lead", uselist=False)
+    submission_record: Mapped["Submission | None"] = relationship(back_populates="lead", uselist=False)
     reviews: Mapped[list["HumanReview"]] = relationship(back_populates="lead", order_by="HumanReview.created_at")
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="lead", order_by="AuditEvent.seq")
     ingest_error: Mapped["IngestError | None"] = relationship(back_populates="lead", uselist=False)
@@ -227,6 +228,26 @@ class GateDecision(Base):
     decided_at: Mapped[dt.datetime] = mapped_column(DateTime)
 
     lead: Mapped["Lead"] = relationship(back_populates="decision")
+    submission: Mapped["Submission | None"] = relationship(back_populates="decision", uselist=False)
+
+
+class Submission(Base):
+    """The demonstrable submission boundary (brief §11): only an
+    AUTO_SUBMIT GateDecision ever gets one. This is a DEMO/MOCK sandbox —
+    no real CIMET CRM submission endpoint exists yet; see
+    app/services/submission.py."""
+
+    __tablename__ = "submissions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lead_id: Mapped[str] = mapped_column(ForeignKey("leads.id"), unique=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("gate_decisions.id"), unique=True)
+    status: Mapped[str] = mapped_column(String(16))  # "SUBMITTED"
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    submitted_at: Mapped[dt.datetime] = mapped_column(DateTime)
+
+    lead: Mapped["Lead"] = relationship(back_populates="submission_record")
+    decision: Mapped["GateDecision"] = relationship(back_populates="submission")
 
 
 class HumanReview(Base):

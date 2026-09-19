@@ -50,9 +50,13 @@ def test_routes_to_qa_review_on_low_confidence_even_if_status_is_review_not_fail
     assert outcome.low_confidence == 1
 
 
-def test_low_confidence_non_critical_check_also_routes_to_qa_review():
+def test_low_confidence_non_critical_check_does_not_route_to_qa_review():
+    """Non-critical confidence never gates the decision — it's coaching
+    signal (brief §15 "never critical, never blocking"), not a reason to
+    escalate a call to a human who didn't need to see it."""
     outcome = evaluate_gate([check(critical=False, status="PASS", confidence=0.5)])
-    assert outcome.decision == "QA_REVIEW"
+    assert outcome.decision == "AUTO_SUBMIT"
+    assert outcome.low_confidence == 0
 
 
 def test_confidence_exactly_at_floor_is_not_low_boundary_is_exclusive():
@@ -104,8 +108,8 @@ def test_describes_qa_review_singular():
 
 
 def test_describes_qa_review_plural():
-    outcome = evaluate_gate([check(confidence=0.5), check(confidence=0.5, critical=False)])
-    assert describe_decision(outcome) == "Insufficient confidence on 2 checks. Never auto-passed."
+    outcome = evaluate_gate([check(confidence=0.5), check(confidence=0.5, critical=True)])
+    assert describe_decision(outcome) == "Insufficient confidence on 2 critical checks. Never auto-passed."
 
 
 def test_describes_a_clean_auto_submit():

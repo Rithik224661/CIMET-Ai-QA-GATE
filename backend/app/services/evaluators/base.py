@@ -88,12 +88,43 @@ def no_evidence_outcome(status: str, confidence: float, rationale: str) -> Check
     )
 
 
+# A confidence value that is *always* below CONFIDENCE_FLOOR (0.85 by
+# default, but this stays correct even if that's retuned lower), used by
+# `not_evaluable_outcome` below. Deliberately not itself read from
+# settings — "not evaluable" must never accidentally clear the floor.
+NOT_EVALUABLE_CONFIDENCE = 0.4
+
+
+def not_evaluable_outcome(rationale: str, *, observed: str | None = None, expected: str | None = None) -> CheckOutcome:
+    """The check genuinely could not be evaluated from the data available
+    (brief §3/§10: "if an input genuinely does not exist: DO NOT return
+    PASS"). Represented as REVIEW status at a confidence that is always
+    below the floor — for a critical check this routes the gate to
+    QA_REVIEW (never a silent PASS, never an unjustified HOLD); for a
+    non-critical check it's a visible, honest "couldn't verify" coaching
+    note that never blocks the sale on its own. This deliberately reuses
+    the existing REVIEW status/confidence-floor mechanism rather than
+    adding a new status value, so the frontend's approved PASS/FAIL/REVIEW
+    vocabulary (glyph + word, CLAUDE.md #5) doesn't need to change."""
+    return CheckOutcome(
+        status=ResultStatus.REVIEW,
+        confidence=NOT_EVALUABLE_CONFIDENCE,
+        observed=observed,
+        expected=expected,
+        rationale=rationale,
+        evidence=None,
+        timestamp_seconds=None,
+    )
+
+
 __all__ = [
     "CheckOutcome",
     "EvaluationContext",
     "Evaluator",
     "EvidenceData",
+    "NOT_EVALUABLE_CONFIDENCE",
     "TranscriptSegmentData",
     "ResultStatus",
     "no_evidence_outcome",
+    "not_evaluable_outcome",
 ]

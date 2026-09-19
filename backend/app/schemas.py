@@ -70,6 +70,14 @@ class GateOutcomeOut(CamelModel):
     rule_applied: str
 
 
+class SubmissionOut(CamelModel):
+    id: int
+    status: str
+    sandbox: str
+    submitted_at: str
+    payload: dict
+
+
 class LeadOut(CamelModel):
     id: str
     scenario_tag: str
@@ -88,6 +96,7 @@ class LeadOut(CamelModel):
     override: HumanOverrideOut | None
     ingest_error: IngestErrorOut | None
     decision: GateOutcomeOut | None
+    submission: SubmissionOut | None = None
 
 
 class LeadsListOut(CamelModel):

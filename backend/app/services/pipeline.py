@@ -9,6 +9,7 @@ produces a GateDecision.
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import random
 
 from sqlalchemy.orm import Session
@@ -17,12 +18,15 @@ from ..config import settings
 from ..enums import AuditEventType, CheckType, Decision, LeadState, ResultStatus
 from ..models import CalibrationSample, Check, CheckResult, Evidence, GateDecision, Lead
 from .audit import append_audit_event
-from .evaluators.base import CheckOutcome, EvaluationContext, TranscriptSegmentData
+from .evaluators.base import CheckOutcome, EvaluationContext, TranscriptSegmentData, not_evaluable_outcome
 from .evaluators.behaviour import evaluate_behaviour
 from .evaluators.factual import evaluate_factual
 from .evaluators.verbatim import evaluate_verbatim
 from .gate import GateCheckInput, describe_decision, evaluate_gate, gate_rule_copy
 from .repeat_offence import count_recent_critical_failures, is_repeat_offence
+from .submission import submit_if_auto_submitted
+
+logger = logging.getLogger(__name__)
 
 
 def record_ingest_events(db: Session, lead: Lead, *, recording_ok: bool) -> None:
@@ -112,6 +116,14 @@ def run_evaluation(db: Session, lead: Lead) -> GateDecision:
     for old_result in list(lead.results):
         lead.results.remove(old_result)
         db.delete(old_result)
+    if lead.submission_record is not None:
+        # Must go before the decision it references is deleted — a
+        # re-evaluation that changes the decision (e.g. AUTO_SUBMIT on a
+        # retry after a transcript fix -> HOLD) must not leave a stale
+        # Submission implying a HOLD lead was submitted.
+        old_submission = lead.submission_record
+        lead.submission_record = None
+        db.delete(old_submission)
     if lead.decision is not None:
         old_decision = lead.decision
         lead.decision = None
@@ -125,7 +137,20 @@ def run_evaluation(db: Session, lead: Lead) -> GateDecision:
     rule_version_label = f"{retailer_label} {lead.checklist_version.version}"
 
     for check in checks:
-        outcome = _evaluate_check(check, context)
+        try:
+            outcome = _evaluate_check(check, context)
+        except Exception:
+            # An evaluator bug must never crash the whole lead's evaluation
+            # (which would leave nothing scored at all) NOR silently pass
+            # the check it was trying to run (brief §42 "evaluator error"
+            # / §16 "evaluator exception"). It becomes exactly the same
+            # not-evaluable, sub-floor-confidence REVIEW as a genuinely
+            # missing input — the gate treats the two identically, which
+            # is the correct conservative behavior either way.
+            logger.exception("evaluator failed for check %s on lead %s", check.code, lead.id)
+            outcome = not_evaluable_outcome(
+                "This check could not be evaluated due to an internal evaluator error; routed to a human rather than assumed correct."
+            )
 
         result = CheckResult(
             check_id=check.id,
@@ -228,6 +253,20 @@ def run_evaluation(db: Session, lead: Lead) -> GateDecision:
 
     lead.state = LeadState.SCORED
     lead.updated_at = dt.datetime.now(dt.UTC)
+    db.flush()  # decision.id must exist before a Submission can reference it
+
+    # The submission boundary (brief §11): ONLY AUTO_SUBMIT ever reaches
+    # this call — HOLD and QA_REVIEW have no code path that creates a
+    # Submission. DEMO/MOCK sandbox — see app/services/submission.py.
+    if outcome.decision == Decision.AUTO_SUBMIT:
+        submission = submit_if_auto_submitted(db, lead, decision)
+        append_audit_event(
+            db,
+            lead_id=lead.id,
+            event_type=AuditEventType.SALE_AUTO_SUBMITTED,
+            actor="Submission service (DEMO/MOCK sandbox)",
+            resulting_state=f"SUBMITTED · {submission.id}",
+        )
 
     db.flush()
     return decision

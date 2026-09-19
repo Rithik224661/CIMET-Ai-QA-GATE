@@ -57,10 +57,24 @@ def test_verbatim_routes_crosstalk_to_review_never_asserts_pass_or_fail():
     assert outcome.confidence < 0.85, "a degraded-audio REVIEW must land below the confidence floor so the gate routes it to QA"
 
 
-def test_verbatim_with_no_config_is_a_documented_pass_through():
+def test_verbatim_with_no_script_configured_is_not_evaluable_never_a_silent_pass():
+    """A misconfigured/unwired check must never default to PASS (brief §3)
+    — it's REVIEW at a confidence that always trips the gate floor."""
     outcome = evaluate_verbatim({}, ctx([seg(1, "AGENT", 0, "anything")]))
-    assert outcome.status == "PASS"
-    assert outcome.evidence is None
+    assert outcome.status == "REVIEW"
+    assert outcome.confidence < 0.85
+
+
+def test_verbatim_with_no_candidate_segments_at_all_is_not_evaluable():
+    """The expected speaker never appears in the required window at all —
+    genuinely nothing to compare against, so this must not be silently
+    treated as either a pass or a confident fail."""
+    outcome = evaluate_verbatim(
+        {"expected_phrase": DISCLAIMER, "window_start": 0, "window_end": 60},
+        ctx([seg(1, "CUSTOMER", 5, "Hello?")]),  # only a CUSTOMER turn; AGENT is the configured speaker
+    )
+    assert outcome.status == "REVIEW"
+    assert outcome.confidence < 0.85
 
 
 # ---- factual ----
@@ -99,16 +113,57 @@ def test_factual_reviews_rather_than_assumes_when_nothing_extractable():
     assert outcome.confidence < 0.85
 
 
-def test_factual_with_no_field_configured_is_a_documented_pass_through():
+def test_factual_with_no_field_configured_is_not_evaluable_never_a_silent_pass():
     outcome = evaluate_factual({}, ctx([seg(1, "AGENT", 0, "anything")]))
-    assert outcome.status == "PASS"
-    assert outcome.evidence is None
+    assert outcome.status == "REVIEW"
+    assert outcome.confidence < 0.85
 
 
 def test_factual_rate_tolerance_is_configurable_and_honored():
     config = {**RATE_CONFIG, "tolerance": 0.5}
     outcome = evaluate_factual(config, ctx([seg(1, "AGENT", 842, "Peak is 31.95 cents per kilowatt hour.")], crm={"peak_rate_cents": 31.9}))
     assert outcome.status == "PASS", "a 0.05c difference is within a configured 0.5c tolerance"
+
+
+# ---- factual: presence mode ----
+
+
+def test_presence_passes_when_the_confirmation_is_found():
+    config = {"kind": "presence", "pattern": r"that'?s me", "speaker": "CUSTOMER", "expected_label": "Account holder confirmed"}
+    outcome = evaluate_factual(config, ctx([seg(1, "CUSTOMER", 150, "Yes, that's me on the account.")]))
+    assert outcome.status == "PASS"
+    assert outcome.confidence >= 0.9
+    assert outcome.evidence is not None
+
+
+def test_presence_is_not_evaluable_not_failed_when_the_confirmation_is_absent():
+    """A critical presence check (e.g. Account holder confirmed) with no
+    matching utterance must route to a human, not manufacture a critical
+    FAIL from a keyword miss."""
+    config = {"kind": "presence", "pattern": r"that'?s me", "speaker": "CUSTOMER", "expected_label": "Account holder confirmed"}
+    outcome = evaluate_factual(config, ctx([seg(1, "AGENT", 10, "Can I confirm who I'm speaking with?")]))
+    assert outcome.status == "REVIEW"
+    assert outcome.confidence < 0.85
+    assert outcome.evidence is None, "must not fabricate an evidence span for something that wasn't found"
+
+
+# ---- factual: conditional not-applicable (skip_if_absent) ----
+
+
+def test_skip_if_absent_passes_correctly_when_source_of_truth_says_nothing_applies():
+    """Gift card value: no gift card on this plan (crm value falsy) means
+    PASS is the CORRECT answer — nothing to mismatch — not a fabricated
+    default."""
+    config = {"field": "gift_card_value", "pattern": r"\$(\d+)", "kind": "numeric", "skip_if_absent": True}
+    outcome = evaluate_factual(config, ctx([seg(1, "AGENT", 10, "No promotional offers on this plan.")], crm={"gift_card_value": None}))
+    assert outcome.status == "PASS"
+    assert outcome.expected == "Not applicable to this plan"
+
+
+def test_skip_if_absent_still_verifies_normally_when_the_source_of_truth_has_a_value():
+    config = {"field": "gift_card_value", "pattern": r"\$(\d+)\s*gift card", "kind": "numeric", "unit": "", "tolerance": 0, "skip_if_absent": True}
+    outcome = evaluate_factual(config, ctx([seg(1, "AGENT", 10, "You'll receive a $50 gift card with this plan.")], crm={"gift_card_value": 100}))
+    assert outcome.status == "FAIL", "a real mismatch must still be caught even though the field supports skip_if_absent"
 
 
 # ---- behaviour ----
@@ -134,7 +189,68 @@ def test_dead_air_passes_when_no_silence_segment_exists():
     assert outcome.status == "PASS"
 
 
-def test_behaviour_never_returns_a_fabricated_critical_signal():
-    outcome = evaluate_behaviour({"metric": "rapport"}, ctx([seg(1, "AGENT", 10, "Hello there.")]))
+def test_unconfigured_behaviour_metric_is_not_evaluable_never_a_silent_pass():
+    outcome = evaluate_behaviour({"metric": "unknown_thing"}, ctx([seg(1, "AGENT", 10, "Hello there.")]))
+    assert outcome.status == "REVIEW"
+    assert outcome.confidence < 0.85
+
+
+# ---- behaviour: interruptions (real crosstalk-marker signal) ----
+
+
+def test_interruptions_passes_with_no_crosstalk_markers():
+    outcome = evaluate_behaviour({"metric": "interruptions", "threshold_count": 2}, ctx([seg(1, "AGENT", 10, "Hello there.")]))
     assert outcome.status == "PASS"
-    assert outcome.evidence is None
+
+
+def test_interruptions_fails_when_crosstalk_markers_reach_the_threshold():
+    outcome = evaluate_behaviour(
+        {"metric": "interruptions", "threshold_count": 1},
+        ctx([seg(1, "AGENT", 588, "for your [crosstalk] plan"), seg(2, "CUSTOMER", 606, "sorry, say that again")]),
+    )
+    assert outcome.status == "FAIL"
+    assert "1" in outcome.observed
+
+
+# ---- behaviour: rapport (real talk-time-share signal) ----
+
+
+def test_rapport_passes_with_a_reasonable_two_way_conversation():
+    segments = [
+        seg(1, "AGENT", 0, "Hello, how are you today?", end=5),
+        seg(2, "CUSTOMER", 5, "Good thanks, how are you?", end=10),
+        seg(3, "AGENT", 10, "Great, let's get started.", end=15),
+        seg(4, "CUSTOMER", 15, "Sounds good to me.", end=20),
+    ]
+    outcome = evaluate_behaviour({"metric": "rapport", "min_customer_share": 0.3}, ctx(segments))
+    assert outcome.status == "PASS"
+
+
+def test_rapport_flags_a_call_where_the_customer_almost_never_speaks():
+    segments = [seg(1, "AGENT", 0, "Long monologue.", end=100), seg(2, "CUSTOMER", 100, "Mm.", end=101)]
+    outcome = evaluate_behaviour({"metric": "rapport", "min_customer_share": 0.08}, ctx(segments))
+    assert outcome.status == "FAIL"
+    assert "customer" in outcome.observed.lower()
+
+
+# ---- behaviour: objection handling (real keyword + follow-up signal) ----
+
+
+def test_objection_handling_passes_when_nothing_to_handle():
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx([seg(1, "AGENT", 10, "Everything sounds great."), seg(2, "CUSTOMER", 16, "Yes, let's proceed.")]))
+    assert outcome.status == "PASS"
+
+
+def test_objection_handling_passes_when_the_agent_responds():
+    segments = [
+        seg(1, "CUSTOMER", 10, "I'm not sure about this, it sounds too expensive."),
+        seg(2, "AGENT", 16, "I understand — let me explain the savings involved."),
+    ]
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx(segments))
+    assert outcome.status == "PASS"
+
+
+def test_objection_handling_fails_when_the_objection_is_never_addressed():
+    segments = [seg(1, "CUSTOMER", 10, "Actually I don't want to proceed with this.")]
+    outcome = evaluate_behaviour({"metric": "objection_handling"}, ctx(segments))
+    assert outcome.status == "FAIL"
