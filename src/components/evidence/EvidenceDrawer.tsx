@@ -134,7 +134,7 @@ export default function EvidenceDrawer({
                     Observed — what the transcript contains
                   </div>
                   <div className={clsx("mt-2 font-mono text-sm", resultTone(result.status) === "pass" ? "text-pass" : resultTone(result.status) === "review" ? "text-review" : "text-fail")}>
-                    {result.observed ?? "Matched the approved value in the transcript."}
+                    {result.observed ?? (result.status === "PASS" ? "Matched the approved value in the transcript." : "Nothing in the transcript matched — no value was found to compare.")}
                   </div>
                 </HairlineCell>
                 <HairlineCell tight>
@@ -148,7 +148,9 @@ export default function EvidenceDrawer({
                   </div>
                   <div className="mt-2 text-[13px] leading-relaxed text-text-2">
                     {result.rationale ??
-                      `Compared the transcript against ${result.sourceOfTruth} under ${result.ruleVersion}. Values agree within tolerance, so the check passes and contributes no block to the gate.`}
+                      (result.status === "PASS"
+                        ? `Compared the transcript against ${result.sourceOfTruth} under ${result.ruleVersion}. Values agree within tolerance, so the check passes and contributes no block to the gate.`
+                        : `Compared the transcript against ${result.sourceOfTruth} under ${result.ruleVersion}. No matching value was found, so this could not be confirmed.`)}
                   </div>
                 </HairlineCell>
               </HairlineGrid>
@@ -157,7 +159,10 @@ export default function EvidenceDrawer({
                 <div className="font-mono text-[10px] uppercase tracking-[0.5px] text-text-dim">Transcript evidence · {displayTs}</div>
                 <div className="mt-2.5 border-l-2 border-accent bg-bg py-2.5 pl-3">
                   <p className="font-mono text-xs leading-relaxed text-text-2">
-                    {result.evidenceQuote ?? "No exception captured — the check passed against the source of truth."}
+                    {result.evidenceQuote ??
+                      (result.status === "PASS"
+                        ? "No exception captured — the check passed against the source of truth."
+                        : "No transcript quote — nothing matched the expected phrase in the required window.")}
                   </p>
                 </div>
               </div>

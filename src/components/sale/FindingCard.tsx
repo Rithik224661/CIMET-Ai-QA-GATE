@@ -40,7 +40,9 @@ export default function FindingCard({
       <HairlineGrid cols="1fr 1fr" className="mt-4 border border-ring">
         <HairlineCell tight>
           <div className="font-mono text-[10px] uppercase tracking-[0.5px] text-text-dim">Observed (transcript)</div>
-          <div className={clsx("mt-2 break-words font-mono text-sm", observedTextTone)}>{result.observed}</div>
+          <div className={clsx("mt-2 break-words font-mono text-sm", observedTextTone)}>
+            {result.observed ?? "Nothing in the transcript matched — no value was found to compare."}
+          </div>
         </HairlineCell>
         <HairlineCell tight>
           <div className="font-mono text-[10px] uppercase tracking-[0.5px] text-text-dim">Expected ({sourceShort})</div>
@@ -50,7 +52,9 @@ export default function FindingCard({
 
       <div className="mt-4 border-l-2 border-bar-muted pl-3 py-0.5">
         <div className="font-mono text-[10px] uppercase tracking-[0.5px] text-text-dim">Evidence</div>
-        <p className="mt-2 font-mono text-xs leading-relaxed text-text-2">{result.evidenceQuote}</p>
+        <p className="mt-2 font-mono text-xs leading-relaxed text-text-2">
+          {result.evidenceQuote ?? "No transcript quote — nothing matched the expected phrase in the required window."}
+        </p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
