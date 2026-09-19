@@ -1,18 +1,30 @@
-import {
-  DASHBOARD_KPIS,
-  DECISION_DISTRIBUTION,
-  FAILING_CHECKS,
-  RECENT_FAILURES,
-  RECENT_OVERRIDES,
-} from "../fixtures/dashboard";
+import { apiGet } from "../api/client";
+import type { DashboardKpi } from "../types";
+import type { RecentFailureRow, RecentOverrideRow } from "../fixtures/dashboard";
 
-/** GET /api/metrics/dashboard — Phase 1 serves the fixture aggregate. */
-export async function getDashboardMetrics() {
-  return {
-    kpis: DASHBOARD_KPIS,
-    distribution: DECISION_DISTRIBUTION,
-    failingChecks: FAILING_CHECKS,
-    recentFailures: RECENT_FAILURES,
-    recentOverrides: RECENT_OVERRIDES,
-  };
+interface DistributionRow {
+  label: string;
+  count: string;
+  pct: string;
+  pctValue: number;
+  tone: "pass" | "fail" | "review";
+}
+
+interface FailingCheckRow {
+  name: string;
+  type: string;
+  count: number;
+}
+
+interface DashboardMetrics {
+  kpis: DashboardKpi[];
+  distribution: DistributionRow[];
+  failingChecks: FailingCheckRow[];
+  recentFailures: RecentFailureRow[];
+  recentOverrides: RecentOverrideRow[];
+}
+
+/** GET /api/dashboard */
+export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  return apiGet<DashboardMetrics>("/api/dashboard");
 }

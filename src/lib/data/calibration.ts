@@ -1,22 +1,18 @@
-import {
-  CALIBRATION_KPIS,
-  CONFIDENCE_BUCKETS,
-  CONFIDENCE_BUCKET_MAX,
-  DISAGREEMENT_CATEGORIES,
-  DISAGREEMENT_MAX,
-  SAMPLED_CALLS_TOTAL,
-  SAMPLED_DISAGREEMENTS_TOTAL,
-} from "../fixtures/calibration";
+import { apiGet } from "../api/client";
+import type { CalibrationKpi } from "../types";
+import type { ConfidenceBucket, DisagreementCategory } from "../fixtures/calibration";
 
-/** GET /api/metrics/calibration */
-export async function getCalibrationMetrics() {
-  return {
-    kpis: CALIBRATION_KPIS,
-    confidenceBuckets: CONFIDENCE_BUCKETS,
-    confidenceBucketMax: CONFIDENCE_BUCKET_MAX,
-    disagreements: DISAGREEMENT_CATEGORIES,
-    disagreementMax: DISAGREEMENT_MAX,
-    sampledCallsTotal: SAMPLED_CALLS_TOTAL,
-    sampledDisagreementsTotal: SAMPLED_DISAGREEMENTS_TOTAL,
-  };
+interface CalibrationMetrics {
+  kpis: CalibrationKpi[];
+  confidenceBuckets: ConfidenceBucket[];
+  confidenceBucketMax: number;
+  disagreements: DisagreementCategory[];
+  disagreementMax: number;
+  sampledCallsTotal: number;
+  sampledDisagreementsTotal: number;
+}
+
+/** GET /api/calibration */
+export async function getCalibrationMetrics(): Promise<CalibrationMetrics> {
+  return apiGet<CalibrationMetrics>("/api/calibration");
 }

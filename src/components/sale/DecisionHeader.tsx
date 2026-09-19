@@ -1,7 +1,7 @@
 import Chip from "@/components/ui/Chip";
 import { HairlineCell, HairlineGrid } from "@/components/ui/StatGrid";
 import { formatDurationMinutes } from "@/lib/format";
-import { gateRuleCopy, describeDecision, type GateOutcome } from "@/lib/gate";
+import type { GateOutcome } from "@/lib/gate";
 import { decisionLabel, decisionTone } from "@/lib/status";
 import type { Lead } from "@/lib/types";
 
@@ -10,7 +10,10 @@ const DECISION_BORDER_TONE = { pass: "border-l-pass", fail: "border-l-fail", rev
 
 export default function DecisionHeader({ lead, gate }: { lead: Lead; gate: GateOutcome }) {
   const tone = decisionTone(gate.decision);
-  const reason = describeDecision(gate, { repeatOffence: lead.repeatOffence, overridden: !!lead.override });
+  // gate.reason / gate.ruleApplied are computed server-side, from the same
+  // gate outcome shown here — never regenerated client-side, so the copy
+  // can't drift from what actually decided the sale.
+  const reason = gate.reason;
 
   const stats = [
     { label: "Checks run", value: gate.checksRun, dim: false },
@@ -42,7 +45,7 @@ export default function DecisionHeader({ lead, gate }: { lead: Lead; gate: GateO
           </div>
           <div className="mt-4 max-w-[460px] text-[15px] leading-normal text-text-2">{reason}</div>
           <div className="mt-3.5 max-w-[460px] font-mono text-xs leading-relaxed text-text-muted">
-            {gateRuleCopy(gate.decision)}
+            {gate.ruleApplied}
           </div>
         </div>
 

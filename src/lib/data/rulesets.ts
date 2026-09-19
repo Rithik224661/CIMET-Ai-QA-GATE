@@ -1,18 +1,20 @@
-import { retailer1CheckDefinitions } from "../fixtures/checks";
-import { RULE_SETS } from "../fixtures/rulesets";
+import { apiGet } from "../api/client";
 import type { CheckDefinition, RuleSetVersion } from "../types";
 
-/** GET /api/rulesets */
+/** GET /api/rules — returned in a stable order the backend guarantees, so
+ * the existing index-based `?set=` URL param selection keeps working. */
 export async function getRuleSets(): Promise<RuleSetVersion[]> {
-  return RULE_SETS;
+  const { ruleSets } = await apiGet<{ ruleSets: RuleSetVersion[] }>("/api/rules");
+  return ruleSets;
 }
 
 /**
- * GET /api/rulesets/[versionId]/checks — every rule set version currently
- * resolves to the one checklist export provided with the brief (Retailer 1
- * energy, v1.4); see docs/DECISIONS.md.
+ * GET /api/checks — every rule set version currently resolves to the one
+ * checklist shared across the app (documented simplification, see
+ * docs/DECISIONS.md); the ruleSet param is intentionally unused.
  */
 export async function getChecksForRuleSet(ruleSet: RuleSetVersion): Promise<CheckDefinition[]> {
   void ruleSet;
-  return retailer1CheckDefinitions();
+  const { checks } = await apiGet<{ checks: CheckDefinition[] }>("/api/checks");
+  return checks;
 }

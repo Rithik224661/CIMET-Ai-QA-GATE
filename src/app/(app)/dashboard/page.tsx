@@ -10,13 +10,14 @@ export const metadata = { title: "Dashboard · CIMET QA Gate" };
 
 export default async function DashboardPage() {
   const { kpis, distribution, failingChecks, recentFailures, recentOverrides } = await getDashboardMetrics();
+  const salesScored = kpis.find((k) => k.label === "Sales scored")?.value ?? "0";
 
   return (
     <ViewShell crumb="Operations" title="Executive QA overview">
       <KpiGrid kpis={kpis} />
 
       <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
-        <DecisionDistribution rows={distribution} totalLabel="1,284 sales scored" />
+        <DecisionDistribution rows={distribution} totalLabel={`${salesScored} sales scored`} />
         <FailingChecks rows={failingChecks} />
       </div>
 

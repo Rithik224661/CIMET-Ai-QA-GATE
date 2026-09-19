@@ -67,19 +67,16 @@ gate to be deterministic and never a hand-waved copy — if the sentence
 were hand-authored per lead, it could silently drift from what the gate
 actually computed.
 
-## Human override is local-only in Phase 1 (no persistence yet)
+## Human override — now persisted for real (superseded)
 
-Confirming a review in the Human Review form shows the "Audit event
-written" confirmation panel using transient client state (CLAUDE.md:
-"only form and playback state is local"). It does **not** yet append a row
-to the Decision lineage sidebar or the full ledger, because Phase 1 has no
-data layer to write to — `HumanReview` and `AuditEvent` are append-only
-tables that don't exist until Phase 2/3. The two pre-seeded fixture leads
-that already carry a `HumanOverride` (lead `3613766`) show what a
-*persisted* override looks like everywhere (banner, lineage, ledger), so
-the shape is fully exercised even though the live form's own submission
-isn't wired to storage yet. Phase 3 wires the form to a server action that
-writes both rows for real, at which point this note should be deleted.
+~~Phase 1 note: the Human Review form was local-state-only.~~ As of the
+backend build, `HumanReviewForm` calls the `submitOverride` server action
+(`src/lib/actions/review.ts`), which `POST`s to `/api/reviews`, and the
+FastAPI backend persists a real `HumanReview` row + a `HUMAN_OVERRIDE`
+`AuditEvent` (append-only, never mutates the `GateDecision` row — CLAUDE.md
+#7). The page revalidates on success, so the override banner, lineage
+sidebar and full ledger all reflect it immediately. See
+`backend/app/api/reviews.py`.
 
 ## Rail badge count ignores the retailer filter
 
@@ -96,5 +93,91 @@ NEXTJS_BUILD_PLAN.md's component map) if this needs to be live.
 Matches the prototype exactly: `retailer` and `range` are written to the
 URL from every view's top bar, but only the Queue view's rows and counts
 read them. `range` doesn't filter anything anywhere yet, in the prototype
-or here — it's state that Phase 2's real metrics endpoints should start
-honoring.
+or here — it's state that a future metrics endpoint should start honoring.
+
+---
+
+# Backend decisions
+
+## Deterministic evaluators, no LLM in the critical path
+
+`backend/app/services/evaluators/*` are regex/normalized-text-comparison
+based, not LLM calls — this is the brief's core requirement (§04: "this
+must NOT become 'send transcript to LLM and ask PASS/FAIL'"). The 6 checks
+that anchor the brief's worked example and the 9 demo scenarios (Recording
+disclaimer, DMO read verbatim, Rates and charges, Email captured, Address
+match, Dead air) have real extraction configured against each lead's
+`crm_snapshot`; the other 14 of the 20 checks in the one checklist export
+have no bespoke extraction wired and return a documented pass-through
+default (their catalogue-default confidence, `PASS`, no fabricated
+evidence). Building bespoke NLP for all 20 fields wasn't a good time
+trade-off for a 12-hour build; the architecture (a common `Evaluator`
+interface returning a structured `CheckOutcome`) supports wiring the rest
+the same way later without touching the gate.
+
+## Transcripts use digit-form numbers, not spelled-out words
+
+The original frontend fixtures spelled numbers out ("twenty-eight point
+six cents") for prototype readability. The backend's seed transcripts use
+digit form ("28.6 cents") instead — both because real ASR output
+typically renders recognized numbers as digits, and because the factual
+evaluator's regex extraction needs a machine-parseable form. Check
+outcomes (PASS/FAIL/REVIEW) match the original narrative; exact confidence
+values may differ slightly from the old hand-authored fixtures now that
+they're genuinely computed — expected, and the point of this phase.
+
+## AI provider defaults to "none" — zero external calls, zero credentials
+
+`backend/app/services/ai_provider.py`'s `LLMProvider` abstraction exists
+per the brief (§43), but nothing in this build's evaluators calls it: every
+check evaluator is fully deterministic. This was a deliberate reliability
+choice for a live, timed hackathon demo — the gate must work with no
+network dependency and no API key. An `AnthropicLLMProvider` stub is wired
+for a future semantic-extraction step (e.g. paraphrase-tolerant script
+matching on messier real call audio) behind `AI_PROVIDER=anthropic` +
+`ANTHROPIC_API_KEY`; a provider failure or malformed output there is
+required to degrade to low-confidence/REVIEW, never a silent PASS.
+
+## Bulk synthetic backfill, separate from the 9 named scenarios
+
+The brief requires dashboard/calibration figures to be computed from
+stored records, not hard-coded (§31/§33). With only the 9 named leads,
+those computed numbers would be tiny and not resemble the approved
+design's mockup figures. `backend/app/seed_data.py`'s `generate_bulk_leads`
+adds ~300 lightweight synthetic leads (randomized but plausible check
+outcomes, fixed RNG seed for reproducibility) purely so dashboard and
+calibration aggregates have realistic volume. They are flagged
+`is_seed_scenario=False` and are deliberately **excluded** from
+`GET /api/leads`'s list response — the Sales scenario rail and QA Queue
+were always meant to show the small, curated 9-scenario set (matching the
+approved design's "Scenario rows" in a 248px rail, not a live
+production-scale queue), so only named scenarios are ever navigable;
+bulk leads are queried directly by the aggregation services and never
+otherwise surfaced.
+
+## Calibration disagreement is seeded directionally, not as a coin flip
+
+A human overturning an AI `HOLD` (critical false-fail) is normal QA
+behavior and seeded at a real, noticeable rate. A human catching something
+critical the AI let through (critical false-pass — "the release-blocking
+metric" per the brief, and the one judged on "essentially never false-
+pass") is seeded at a much lower rate (~0.6% vs ~12%), not the same
+probability as the benign direction — a naive symmetric coin-flip produced
+a double-digit false-pass count that contradicted the entire premise of
+the calibration screen. See `backend/app/seed.py`'s `_seed_calibration_reviews`.
+
+## Repeat-offence history is seeded, not hard-coded
+
+Lead `3613778`'s `repeatOffence` flag is computed for real by
+`count_recent_critical_failures` — two synthetic prior calls for the same
+agent, same critical check (`RET1-VB-001`), dated inside the rolling
+7-day window, are seeded in `REPEAT_OFFENCE_HISTORY` specifically so the
+count reaches the configured threshold (3) genuinely, rather than setting
+the boolean directly.
+
+## SQLite, single-process, synchronous SQLAlchemy
+
+Brief §3 calls for "SQLite for local/hackathon reliability" explicitly —
+followed as specified. No async DB driver, no connection pool tuning: this
+is sized for a live demo, not concurrent production traffic. Revisit
+(Postgres, async SQLAlchemy) before any real multi-user deployment.

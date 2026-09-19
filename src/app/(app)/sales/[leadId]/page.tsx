@@ -91,7 +91,7 @@ export default async function SalePage({
               />
 
               <div className="mt-7 grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
-                <HumanReviewForm decision={gate.decision} decisionLabel={decisionLabel(gate.decision)} />
+                <HumanReviewForm leadId={lead.id} decision={gate.decision} decisionLabel={decisionLabel(gate.decision)} />
                 <Lineage leadId={lead.id} events={buildLineage(lead, gate)} />
               </div>
 
