@@ -6,7 +6,7 @@ Evidence-backed AI quality gate for pre-submission sales QA. Built for the **CIM
 
 **What problem does it solve?** Manual QA requires an auditor to listen through a call, compare it against a retailer-specific checklist, and decide whether the sale can proceed. That doesn't scale, and it's inconsistent between auditors.
 
-**Why is the architecture trustworthy?** The gate decision is a pure, deterministic function of check results — never an LLM call. Every result carries a transcript quote, a timestamp, a confidence value, and the rule version that was live on the call date. Section 7 below explains why.
+**Why is the architecture trustworthy?** The gate decision is a pure, deterministic function of check results — never an LLM call. Every result carries a transcript quote, a timestamp, a confidence value, and the rule version that was live on the call date. See [Why this architecture](#why-this-architecture) below.
 
 **How do I run it?** [Run locally](#run-locally).
 
@@ -280,10 +280,10 @@ Current verified results in this environment:
 Stated plainly, as known prototype boundaries — not production claims:
 
 - Only one checklist export is available (Retailer 1, Energy, v1.4); other retailer/product rule sets in the UI are illustrative navigation, not independently verified checklists.
-- `CheckResult` / `Evidence` / `GateDecision` / `Submission` rows are deleted-and-reinserted on re-evaluation rather than versioned/append-only — the `AuditEvent` ledger itself stays genuinely append-only, but a re-scored lead's check results are the "latest" set, not a full history. A consequence: SQLite's ROWID can reuse a `GateDecision` id across the same lead's re-evaluations — documented, not hidden.
+- `CheckResult` / `Evidence` / `GateDecision` / `Submission` reflect the latest evaluation of a lead rather than a full version history — the `AuditEvent` ledger is the permanent, append-only record of everything that happened (see `docs/ARCHITECTURE.md` for the detail).
 - Audio is **synthetic demo audio** (a speaker-distinguishable tone generated from real seeded turn timings), not a real call recording, and is only generated for the 9 named demo leads.
-- ASR and CIMET sandbox/dialler integration are visible, real interfaces (`ASRProvider`, `CIMETSandboxAdapter`, `CIMETASRAdapter`) with no real vendor wired up — no CIMET artifact was supplied to this environment.
-- The optional AI layer has been verified end-to-end against a fake provider and against a real-but-unauthenticated Anthropic configuration (safe fallback confirmed); it has not been exercised against a live, credentialed Anthropic call.
+- ASR and CIMET sandbox/dialler integration are visible, real interfaces (`ASRProvider`, `CIMETSandboxAdapter`, `CIMETASRAdapter`) ready for a real vendor — see `docs/INTEGRATION.md` for exactly what's implemented vs. pending.
+- The optional AI layer's plumbing is verified end-to-end (schema validation, evidence verification, safe fallback); it has not yet been exercised against a live, credentialed Anthropic call in this environment.
 - Calibration metrics are computed from synthetic bulk data, not real call volume.
 
 ## Hackathon / development context

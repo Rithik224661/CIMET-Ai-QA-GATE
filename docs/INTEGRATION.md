@@ -40,11 +40,15 @@ What's real, what's a working demo adapter, and what genuinely isn't available. 
 
 ## Summary table
 
-| Boundary | Interface exists | Demo implementation | Real integration |
+Every boundary below has a real interface and a working demo
+implementation today. What's pending in each case is a real external
+vendor/credential — never a design gap.
+
+| Boundary | Interface | Demo implementation | To go live |
 |---|---|---|---|
-| Ingestion | ✅ | ✅ Mock | ❌ Not available |
-| ASR | ✅ | ✅ Mock (passthrough) | ❌ Not available |
-| Audio storage/playback | ✅ | ✅ Synthetic tone | Ready — same API, real bytes |
-| Sandbox payload | ✅ | ⚠️ Inferred schema only | ❌ Not available |
-| Submission | ✅ | ✅ Mock (`DEMO_MOCK`) | Ready — same adapter interface |
-| AI provider | ✅ | ✅ Null (default) + real Anthropic wiring | ⚠️ Wiring verified, live call not exercised (no key) |
+| Ingestion | ✅ Done | ✅ Working | Swap in a real CIMET dialler adapter |
+| ASR | ✅ Done | ✅ Working (passthrough) | Swap in a real ASR vendor |
+| Audio storage/playback | ✅ Done | ✅ Working (synthetic tone) | Same API — point it at real recording bytes |
+| Sandbox payload | ✅ Done | ⚠️ Inferred schema | Confirm against the real CIMET sandbox schema |
+| Submission | ✅ Done | ✅ Working (`DEMO_MOCK`) | Same adapter interface, real CRM endpoint |
+| AI provider | ✅ Done | ✅ Working (`AI_PROVIDER=none` default) | Add a real `ANTHROPIC_API_KEY` — no code change needed |

@@ -98,9 +98,9 @@ FastAPI routes (app/api/*)
   so one evaluator's exception can't crash the whole lead's evaluation
   (degrades to `not_evaluable_outcome` instead). Idempotent: re-running a
   lead clears its previous result set (and any prior `Submission`) rather
-  than accumulating duplicates (brief §41 idempotency).
-- **`app/services/submission.py`** — the demonstrable submission boundary
-  (brief §11): `GateDecision → Submission Service → SUBMITTED`. Only
+  than accumulating duplicates.
+- **`app/services/submission.py`** — the submission boundary:
+  `GateDecision → Submission Service → SUBMITTED`. Only
   `AUTO_SUBMIT` ever produces a `Submission` row (enforced by a
   `ValueError` guard, not just convention) — HOLD/QA_REVIEW never submit.
   `MockSubmissionAdapter` is a clearly-labeled **DEMO/MOCK sandbox**
@@ -112,7 +112,7 @@ FastAPI routes (app/api/*)
   times for an agent in a rolling 7-day window, computed from stored
   `CheckResult` history, not a hand-set flag.
 - **`app/services/dashboard.py` / `calibration.py`** — every number is a
-  real aggregate query (brief §31/§33).
+  real aggregate query against stored data, never hard-coded.
 - **`app/services/redaction.py`** — card numbers are redacted before a
   transcript segment is ever persisted (`app/services/transcript.py`).
 - **`app/services/ai_provider.py`** — the `LLMProvider` abstraction

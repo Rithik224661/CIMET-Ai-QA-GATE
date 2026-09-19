@@ -1,11 +1,8 @@
 # Check audit
 
 Full audit of all 20 configured checks in the one checklist export in hand
-(Retailer 1, Energy, v1.4). First produced in Phase 3 (rubric closure /
-false-pass elimination); updated in Phase 4 (behaviour intelligence + AI
-augmentation) with the AI-used and gate-effect columns and the enhanced
-Behaviour signals. Describes what the code actually does — no marketing
-language.
+(Retailer 1, Energy, v1.4) — what each one actually does, whether AI is
+ever involved, and its exact effect on the gate.
 
 | # | Check | Type | Critical? | Implementation | AI used? | Evidence? | Confidence? | Gate effect | Tested? |
 |---|---|---|---|---|---|---|---|---|---|
@@ -34,7 +31,8 @@ language.
 
 ```
 20 checks
-├── 20 executable (0 unconditional-PASS pass-throughs)
+├── 20 genuinely evaluated — every one runs real logic against the
+│      transcript/CRM, none defaults to an unconditional PASS
 ├── 12 critical, all genuinely enforced — each can independently produce
 │      FAIL from real transcript+CRM comparison, verified in
 │      tests/test_scenarios_e2e.py and tests/test_api_leads.py
@@ -48,21 +46,21 @@ language.
 │      the gate decision — structurally impossible (ai_behaviour.py is
 │      only ever called from the 3 non-critical metrics above)
 └── The NOT_EVALUABLE path (REVIEW + confidence always below the floor)
-       is real and exercised live: Lead 3613778's "Account holder
-       confirmed" genuinely resolves to it, not a hardcoded case
+       is live: lead 3613778's "Account holder confirmed" check
+       resolves to it from the actual transcript content on each run
 ```
 
-## Gate scoping (current, authoritative)
+## Gate scoping
 
 `criticalFails > 0 → HOLD; ANY check's confidence < floor → QA_REVIEW;
 else AUTO_SUBMIT` (`backend/app/services/gate.py`). A low-confidence
 non-critical check (including all 3 Behaviour heuristics above) can only
 ever produce `QA_REVIEW`, never `HOLD` — the `critical_fails` count that
-drives `HOLD` only ever counts critical checks. See
-`docs/DECISIONS.md`'s Phase 4 section for why an earlier critical-only
-reading of the low-confidence rule was corrected back to this.
+drives `HOLD` only ever counts critical checks. See `docs/DECISIONS.md`
+for the rationale behind scoping the confidence floor to every check
+rather than critical ones only.
 
-## Deterministic vs. AI-eligible, one more time, plainly
+## Deterministic vs. AI-eligible, by check
 
 ```
 Critical compliance (12 checks: disclaimer, account holder, address,

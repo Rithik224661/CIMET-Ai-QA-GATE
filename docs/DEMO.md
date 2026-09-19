@@ -76,7 +76,7 @@ No real Anthropic key was available in this environment. What *was* verified liv
 ```bash
 AI_PROVIDER=anthropic uvicorn app.main:app --port 8000 &
 curl -X POST localhost:8000/api/evaluations -H "Content-Type: application/json" -d '{"leadId":"3613824"}'
-curl localhost:8000/api/audit/3613824   # look for the "Ai Evaluation" / AI_FALLBACK entry
+curl localhost:8000/api/audit/3613824   # look for the "AI Evaluation" / AI_FALLBACK entry
 ```
 
 If a real `ANTHROPIC_API_KEY` is supplied, the exact same code path makes one real contextual call per lead instead — see `docs/CHECK_AUDIT.md`.

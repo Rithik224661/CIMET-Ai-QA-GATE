@@ -21,12 +21,12 @@ A production Next.js rebuild of an approved, high-fidelity frontend design for a
 
 ## Conventions
 
-- TypeScript strict; no `any`. Zod at every boundary.
+- TypeScript strict; no `any`. Pydantic validates every API boundary on the backend.
 - Server components by default; `"use client"` only for the evidence drawer, filters, timeline selection, override form, responsive rail.
 - View state lives in the URL (`?filter=`, `?check=`, `?tab=`, `?t=`); only form and playback state is local.
 - One source of truth for status → color/glyph mapping (`lib/status.ts`). No scattered ternaries.
 - Tailwind tokens from `tailwind.config.ts`; no arbitrary hex values in components.
-- Append-only tables: `CheckResult`, `GateDecision`, `HumanReview`, `AuditEvent`. Never `UPDATE`, never `DELETE`.
+- `HumanReview` and `AuditEvent` are append-only: never `UPDATE`, never `DELETE`. `CheckResult`/`Evidence`/`GateDecision`/`Submission` are replaced wholesale on re-evaluation (see docs/DECISIONS.md) — the audit ledger, not these tables, is the permanent record of what happened.
 - Tests: Vitest for comparators and gate logic (exhaustive), Playwright for the demo flow (open lead → see HOLD → open evidence → override → see audit event).
 
 ## Workflow
