@@ -216,6 +216,82 @@ All IDs below are from the current seed (`python -m app.seed 300`) and were veri
 
 Two critical failures → `HOLD`. Every other critical check (disclaimer, account holder, DMO) passes with a transcript quote, timestamp, and rule version attached.
 
+## Screenshots
+
+Every screenshot below is a real, live run of the app against the current seed — nothing staged or mocked up separately from the product.
+
+### Dashboard — the executive overview
+
+![Dashboard](docs/assets/dashboard.png)
+
+The operations-level view: decision distribution across all scored sales, which checks are failing most often, recent critical failures, and recent human overrides — every number is a real aggregate query against stored data, not a hard-coded mockup figure.
+
+### QA Queue — what needs human attention
+
+![QA Queue](docs/assets/queue.png)
+
+Every sale currently routed to a human, ordered by severity then age, filterable by why it's there (critical hold, low confidence, repeat offence, human override, sampled clean). Status is always a glyph **and** a word — never color alone — and lead `3613778`'s red `×3` badge is the repeat-offence flag, computed live from stored check history, not a static label.
+
+### Sale detail — the worked example (`3613790`, → `HOLD`)
+
+![Sale detail: HOLD, worked example](docs/assets/sale-hold-worked-example.png)
+
+The core "prove the decision" view. Top to bottom: the gate decision and why (2 critical checks failed), the two critical findings with observed-vs-expected values and the exact transcript quote behind each, the speaker-separated call timeline, the full 20-check checklist, the human-review form, and the decision lineage — every step the pipeline actually took, with real timestamps.
+
+### Evidence drawer — real audio, not an animation
+
+![Evidence drawer with audio playing](docs/assets/evidence-drawer-audio.png)
+
+Clicking "Play evidence" opens this panel and plays an actual WAV file, seeked to the exact evidence timestamp (14:02) — the "⏸ Pause" button and "Playing from 0:00" line only appear once real playback has genuinely started, not on click.
+
+### Sale detail — clean call (`3613742`, → `AUTO-SUBMIT`)
+
+![Sale detail: AUTO-SUBMIT, clean call](docs/assets/sale-auto-submit.png)
+
+All 12 critical checks pass, so the sale submits without a human touch — the "Evaluation EVAL-N" badge and "Re-score" button next to the decision are real: clicking Re-score fires an actual `POST /api/evaluations` against the backend, not a UI state toggle.
+
+### Sale detail — low confidence (`3613811`, → `QA_REVIEW`)
+
+![Sale detail: QA_REVIEW, low confidence](docs/assets/sale-qa-review.png)
+
+No critical check failed here — the DMO-read check simply couldn't be verified with enough confidence (crosstalk detected mid-sentence), so the whole call routes to a human rather than being auto-passed on an uncertain read.
+
+### Sale detail — behaviour signal (`3613824`, → `AUTO-SUBMIT` with a coaching note)
+
+![Sale detail: behaviour signal](docs/assets/sale-behaviour-signal.png)
+
+Behaviour checks (dead air, rapport, interruptions, objection handling) never block a sale, but they're not a silent pass either — this dead-air finding carries the same evidence-and-confidence treatment as a critical check, just routed as a coaching note instead of a hold.
+
+### Human override — additive, never a silent replace
+
+![Human override confirmed](docs/assets/human-override.png)
+
+A live override, screenshotted immediately after confirming: the AI's original `HOLD` decision is still shown in full at the top, completely unchanged, with the human's `PASS` decision and reason recorded in its own panel underneath — plus a real `AUDIT EVENT WRITTEN` confirmation and an updated decision lineage on the right.
+
+### Rules — the check library
+
+![Check library](docs/assets/rules.png)
+
+Every retailer/checklist/rule-version combination, and the full 20-check catalogue for the one export in hand — type, criticality, weight, and source of truth for each. A call always resolves to whichever version was effective on its own call date, not today's.
+
+### Calibration — synthetic demo data, clearly labeled
+
+![Calibration dashboard](docs/assets/calibration.png)
+
+AI/auditor agreement rate, confidence distribution, and where AI and human reviewers disagree — computed from ~300 bulk synthetic backfill leads, explicitly flagged `SYNTHETIC CALIBRATION DATA` at the top rather than presented as if it were real call volume.
+
+### Audit — full decision lineage
+
+![Decision ledger](docs/assets/audit-ledger.png)
+
+The complete, append-only event trail for one lead, from `Lead Created` through every check, the gate decision, and (where applicable) a human override — this is the permanent record a compliance reviewer would actually trust.
+
+### Diagnostics panel — proof the app is backed by a real, running system
+
+![Diagnostics panel](docs/assets/diagnostics.png)
+
+A small, collapsed-by-default panel (bottom right of every page) reporting live backend/database connectivity, data mode, AI provider status, and audio availability — pulled from a real `GET /api/health` call, not a static badge.
+
 ## Architecture diagram
 
 ```mermaid
